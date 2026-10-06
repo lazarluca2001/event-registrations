@@ -8,11 +8,11 @@
 <style>
   :root {
     --bg: #f6f7f4; --card: #ffffff; --ink: #1d2320; --muted: #66706a;
-    --line: #dde2dc; --accent: #2f7a4f; --accent-soft: #e3f0e6; --warn: #b4531f;
+    --line: #dde2dc; --accent: #2f7a4f; --accent-ink: #ffffff; --accent-soft: #e3f0e6; --warn: #b4531f;
   }
   @media (prefers-color-scheme: dark) {
     :root { --bg: #131614; --card: #1c201d; --ink: #e8ece9; --muted: #98a29b;
-            --line: #2f3631; --accent: #6cc28f; --accent-soft: #233a2b; --warn: #f0a070; }
+            --line: #2f3631; --accent: #6cc28f; --accent-ink: #10180f; --accent-soft: #233a2b; --warn: #f0a070; }
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--ink);
@@ -20,40 +20,63 @@
   .wrap { max-width: 1200px; margin: 0 auto; padding: 24px 16px 64px; }
   h1 { font-size: 22px; margin: 0 0 4px; }
   .sub { color: var(--muted); margin: 0 0 20px; }
+  .hidden { display: none !important; }
+  a { color: var(--accent); }
+  .tag { font-size: 12px; color: var(--muted); }
+
   form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   input[type=text] { font: inherit; padding: 9px 12px; border: 1px solid var(--line);
          border-radius: 8px; background: var(--card); color: var(--ink); width: 160px; }
   button { font: inherit; padding: 9px 14px; border-radius: 8px; border: 1px solid var(--line);
            background: var(--card); color: var(--ink); cursor: pointer; }
-  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
   button:disabled { opacity: .5; cursor: default; }
   label.chk { color: var(--muted); display: flex; gap: 6px; align-items: center; }
   #status { margin: 16px 0; color: var(--muted); min-height: 1.4em; }
   #status.err { color: var(--warn); }
-  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 20px; align-items: center; }
-  .toolbar input { width: 220px; }
+
+  /* chipek */
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .chip { font: inherit; font-size: 13px; line-height: 1; padding: 7px 11px; border-radius: 999px;
+          border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer;
+          display: inline-flex; gap: 6px; align-items: center; transition: background .12s, border-color .12s; }
+  .chip:hover { border-color: var(--accent); }
+  .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .chip .n { font-size: 11px; opacity: .7; font-variant-numeric: tabular-nums; }
+  .chip.ghost { border-style: dashed; color: var(--muted); }
+  .known { margin-top: 14px; }
+
+  /* szűrősáv */
+  .filters { position: sticky; top: 0; z-index: 5; background: var(--bg);
+             padding: 12px 0 10px; margin-bottom: 8px; border-bottom: 1px solid var(--line); }
+  .frow { display: grid; grid-template-columns: 88px 1fr; gap: 8px; align-items: center; margin-bottom: 6px; }
+  .frow > .lbl { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  @media (max-width: 640px) { .frow { grid-template-columns: 1fr; gap: 4px; } }
+  .fbottom { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+  .fbottom input { width: 220px; }
+  #filterInfo { margin-left: auto; }
+
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 16px; align-items: center; }
+  .sheetbox { background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 10px;
+              padding: 10px 14px; margin-bottom: 16px; }
+
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
           padding: 16px; margin-bottom: 16px; }
   .card h2 { font-size: 16px; margin: 0 0 12px; display: flex; justify-content: space-between; gap: 8px; }
-  .card h2 small { color: var(--muted); font-weight: 400; }
+  .card h2 small { color: var(--muted); font-weight: 400; white-space: nowrap; }
   table { border-collapse: collapse; width: 100%; }
   th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
   th { font-size: 13px; color: var(--muted); font-weight: 600; }
   td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; width: 3.5em; color: var(--muted); }
   .summary td.num { color: var(--ink); width: auto; }
-  .summary tr { cursor: pointer; }
-  .summary tr:hover td { background: var(--accent-soft); }
+  .summary tbody tr { cursor: pointer; }
+  .summary tbody tr:hover td { background: var(--accent-soft); }
+  .summary tfoot td { font-weight: 600; border-bottom: none; }
   .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .cols.single { grid-template-columns: 1fr; }
   @media (max-width: 640px) { .cols { grid-template-columns: 1fr; } }
-  .tag { font-size: 12px; color: var(--muted); }
-  .hidden { display: none; }
-  a { color: var(--accent); }
-  .known { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-  .chip { font: inherit; font-size: 13px; padding: 4px 10px; border-radius: 999px;
-          border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; }
-  .chip:hover { border-color: var(--accent); }
-  .sheetbox { background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 10px;
-              padding: 10px 14px; margin-bottom: 16px; }
+  mark { background: #ffe58a; color: inherit; border-radius: 2px; }
+  @media (prefers-color-scheme: dark) { mark { background: #6b5a12; } }
 </style>
 </head>
 <body>
@@ -67,26 +90,40 @@
     <label class="chk"><input type="checkbox" id="refresh"> friss adat (cache nélkül)</label>
   </form>
 
-  <div id="known" class="known hidden">
+  <div id="known" class="known chips hidden">
     <span class="tag">Már elkészült táblázatok:</span>
-    <span id="knownList"></span>
+    <span id="knownList" class="chips"></span>
   </div>
 
   <div id="status"></div>
-
   <div id="sheetBox" class="sheetbox hidden"></div>
 
   <div id="result" class="hidden">
     <div class="toolbar">
-      <input type="text" id="search" placeholder="Keresés névre…">
       <button id="xlsx">Letöltés .xlsx</button>
       <button id="sheet">Google Sheet létrehozása</button>
       <button id="copyLink">Link másolása</button>
       <span id="meta" class="tag"></span>
     </div>
+
+    <div class="filters">
+      <div class="frow"><span class="lbl">Típus</span><div class="chips" id="fType"></div></div>
+      <div class="frow"><span class="lbl">Szint</span><div class="chips" id="fLevel"></div></div>
+      <div class="frow"><span class="lbl">Szerep</span><div class="chips" id="fRole"></div></div>
+      <div class="fbottom">
+        <input type="text" id="search" placeholder="Keresés névre…">
+        <button class="chip ghost" id="reset" type="button">Szűrők törlése</button>
+        <span id="filterInfo" class="tag"></span>
+      </div>
+    </div>
+
     <div class="card">
       <h2>Összesítés <small id="totals"></small></h2>
-      <table class="summary"><thead><tr><th>Divízió</th><th class="num">Leader</th><th class="num">Follower</th><th class="num">Pár</th></tr></thead><tbody id="sumBody"></tbody></table>
+      <table class="summary">
+        <thead><tr><th>Divízió</th><th class="num">Leader</th><th class="num">Follower</th><th class="num">Pár</th></tr></thead>
+        <tbody id="sumBody"></tbody>
+        <tfoot><tr><td>Összesen (szűrt)</td><td class="num" id="sumL"></td><td class="num" id="sumF"></td><td class="num" id="sumC"></td></tr></tfoot>
+      </table>
     </div>
     <div id="divs"></div>
   </div>
@@ -96,21 +133,48 @@
 /* ===== BEÁLLÍTÁS: ide jön az Apps Script webapp URL-je ===== */
 const API_URL = 'https://script.google.com/macros/s/AKfycbwjachnu0pwyKuPuMEM05Lv9zIMmNrxzSYSZOWuKnEwWgGvIviarYN80xl5wTYTB2Yd/exec';
 
-/* ===== Divízió-logika (ugyanaz, mint a Code.gs-ben) ===== */
-const LEVELS = [/newcomer/i, /novice/i, /intermediate|\binter\b/i, /advanced/i,
-  /all[\s-]?stars?/i, /champion/i, /sophisticated/i, /masters?/i, /junior/i, /invitational/i];
-function divisionOrder(name) {
-  const idx = LEVELS.findIndex(re => re.test(name));
-  return (/strictly/i.test(name) ? 100 : 0) + (idx < 0 ? 50 : idx);
+/* ===== Divízió-felismerés ===== */
+const LEVEL_DEFS = [
+  ['newcomer', 'Newcomer', /newcomer/i],
+  ['novice', 'Novice', /novice/i],
+  ['intermediate', 'Intermediate', /intermediate|\binter\b/i],
+  ['advanced', 'Advanced', /advanced/i],
+  ['allstar', 'All-Star', /all[\s-]?stars?/i],
+  ['champion', 'Champion', /champion/i],
+  ['open', 'Open', /\bopen\b/i],
+  ['sophisticated', 'Sophisticated', /soph?isticated/i],   // a „Sopisticated” elírást is
+  ['masters', 'Masters', /masters?/i],
+  ['junior', 'Junior', /junior/i],
+  ['invitational', 'Invitational', /invitational/i]
+];
+const TYPE_DEFS = [
+  ['jj', 'Jack&Jill'], ['strictly', 'Strictly'], ['other', 'Egyéb']
+];
+const ROLE_DEFS = [['Leader', 'Leader'], ['Follower', 'Follower']];
+
+function levelOf(name) {
+  const i = LEVEL_DEFS.findIndex(d => d[2].test(name));
+  return i < 0 ? { key: 'other', label: 'Egyéb', idx: 50 } : { key: LEVEL_DEFS[i][0], label: LEVEL_DEFS[i][1], idx: i };
 }
+function typeOf(name) {
+  if (/strictly/i.test(name)) return 'strictly';
+  if (/jack\s*&?\s*(and\s*)?jill|j\s*&\s*j/i.test(name)) return 'jj';
+  return 'other';
+}
+
 function buildDivisions(rows) {
   const map = new Map();
-  rows.forEach(r => { if (!map.has(r.competition)) map.set(r.competition, []); map.get(r.competition).push(r); });
+  rows.forEach(r => {
+    const name = (r.competition || '').trim() || '(név nélküli divízió)';
+    if (!map.has(name)) map.set(name, []);
+    map.get(name).push(r);
+  });
   const byBib = (a, b) => a.bib - b.bib;
   const norm = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
   return [...map.entries()].map(([name, list]) => {
+    const level = levelOf(name), type = typeOf(name);
     const withPartner = list.filter(r => r.partner).length;
-    const isCouple = /strictly/i.test(name) || (list.length >= 4 && withPartner / list.length >= 0.8);
+    const isCouple = type === 'strictly' || (list.length >= 4 && withPartner / list.length >= 0.8);
     const leaders = list.filter(r => r.role === 'Leader').sort(byBib);
     const followers = list.filter(r => r.role === 'Follower').sort(byBib);
     const other = list.filter(r => r.role !== 'Leader' && r.role !== 'Follower').sort(byBib);
@@ -124,29 +188,52 @@ function buildDivisions(rows) {
       });
       couples.sort(byBib);
     }
-    return { name, order: divisionOrder(name), isCouple, leaders, followers, other, couples };
-  }).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+    return { name, level, type, isCouple, leaders, followers, other, couples,
+             order: (type === 'strictly' ? 100 : 0) + level.idx };
+  })
+  // üres / név nélküli, szerep nélküli blokkok (pl. az oldal egyéb dobozai) kihagyása
+  .filter(d => d.leaders.length + d.followers.length > 0 || (d.other.length > 0 && !/^\(név nélküli/.test(d.name)))
+  .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
 }
 
-/* ===== UI ===== */
+/* ===== Állapot ===== */
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 let current = null, divisions = [];
+const filters = { type: new Set(), level: new Set(), role: new Set(), q: '' };
 
 function setStatus(msg, isErr) { $('status').textContent = msg; $('status').className = isErr ? 'err' : ''; }
 
 async function api(params) {
-  const url = API_URL + '?' + new URLSearchParams(params);
-  const res = await fetch(url);
+  const res = await fetch(API_URL + '?' + new URLSearchParams(params));
   if (!res.ok) throw new Error('HTTP ' + res.status);
   const data = await res.json();
   if (!data.ok) throw new Error(data.error || 'Ismeretlen hiba');
   return data;
 }
 
+/* ===== URL hash: #452&type=strictly&level=novice,advanced&role=Leader&q=anna ===== */
+function readHash() {
+  const [id, ...rest] = location.hash.replace(/^#/, '').split('&');
+  const p = new URLSearchParams(rest.join('&'));
+  ['type', 'level', 'role'].forEach(k => { filters[k] = new Set((p.get(k) || '').split(',').filter(Boolean)); });
+  filters.q = p.get('q') || '';
+  return id;
+}
+function writeHash() {
+  if (!current) return;
+  const p = new URLSearchParams();
+  ['type', 'level', 'role'].forEach(k => { if (filters[k].size) p.set(k, [...filters[k]].join(',')); });
+  if (filters.q) p.set('q', filters.q);
+  const s = p.toString();
+  history.replaceState(null, '', '#' + current.eventId + (s ? '&' + s : ''));
+}
+
+/* ===== Betöltés ===== */
 async function load(eventId, refresh) {
   $('go').disabled = true;
   $('result').classList.add('hidden');
+  $('sheetBox').classList.add('hidden');
   const t0 = Date.now();
   const timer = setInterval(() => setStatus(`Lekérés folyamatban… ${Math.round((Date.now() - t0) / 1000)} mp (első lekérésnél 1–3 perc is lehet)`), 1000);
   try {
@@ -157,7 +244,6 @@ async function load(eventId, refresh) {
     render();
     renderSheet(current.sheet);
     setStatus('');
-    history.replaceState(null, '', '#' + eventId);
   } catch (e) {
     setStatus('Hiba: ' + e.message, true);
   } finally {
@@ -166,9 +252,24 @@ async function load(eventId, refresh) {
   }
 }
 
-function personTable(title, list) {
-  return `<div><table><thead><tr><th class="num">#</th><th>${esc(title)} (${list.length})</th></tr></thead><tbody>` +
-    list.map(r => `<tr data-n="${esc(r.name.toLowerCase())}"><td class="num">${r.bib}</td><td>${esc(r.name)}${r.partner ? ` <span class="tag">· ${esc(r.partner)}</span>` : ''}</td></tr>`).join('') +
+/* ===== Megjelenítés ===== */
+function chip(group, key, label, count) {
+  const on = filters[group].has(key);
+  return `<button type="button" class="chip" data-g="${group}" data-k="${esc(key)}" aria-pressed="${on}">${esc(label)}${count != null ? ` <span class="n">${count}</span>` : ''}</button>`;
+}
+
+function renderChips() {
+  const countBy = (fn) => divisions.reduce((m, d) => (m[fn(d)] = (m[fn(d)] || 0) + 1, m), {});
+  const tc = countBy(d => d.type), lc = countBy(d => d.level.key);
+  $('fType').innerHTML = TYPE_DEFS.filter(([k]) => tc[k]).map(([k, l]) => chip('type', k, l, tc[k])).join('');
+  const levels = LEVEL_DEFS.map(d => [d[0], d[1]]).concat([['other', 'Egyéb']]);
+  $('fLevel').innerHTML = levels.filter(([k]) => lc[k]).map(([k, l]) => chip('level', k, l, lc[k])).join('');
+  $('fRole').innerHTML = ROLE_DEFS.map(([k, l]) => chip('role', k, l)).join('');
+}
+
+function personTable(title, list, role) {
+  return `<div data-role="${role}"><table><thead><tr><th class="num">#</th><th>${esc(title)} (${list.length})</th></tr></thead><tbody>` +
+    list.map(r => `<tr data-n="${esc(r.name.toLowerCase())}"><td class="num">${r.bib}</td><td class="nm" data-t="${esc(r.name)}">${esc(r.name)}</td></tr>`).join('') +
     `</tbody></table></div>`;
 }
 
@@ -184,53 +285,137 @@ function render() {
     let body;
     if (d.isCouple) {
       body = `<table><thead><tr><th class="num">#</th><th>Leader</th><th>Follower</th></tr></thead><tbody>` +
-        d.couples.map(c => `<tr data-n="${esc((c.leader + ' ' + c.follower).toLowerCase())}"><td class="num">${c.bib}</td><td>${esc(c.leader)}</td><td>${esc(c.follower)}${c.followerOnly ? ' <span class="tag">(csak a follower nevezett)</span>' : ''}</td></tr>`).join('') +
+        d.couples.map(c => `<tr data-n="${esc((c.leader + ' ' + c.follower).toLowerCase())}"><td class="num">${c.bib}</td><td class="nm" data-t="${esc(c.leader)}">${esc(c.leader)}</td><td><span class="nm" data-t="${esc(c.follower)}">${esc(c.follower)}</span>${c.followerOnly ? ' <span class="tag">(csak a follower nevezett)</span>' : ''}</td></tr>`).join('') +
         `</tbody></table>`;
     } else {
-      body = `<div class="cols">${personTable('Leader', d.leaders)}${personTable('Follower', d.followers)}</div>`;
+      body = `<div class="cols">${personTable('Leader', d.leaders, 'Leader')}${personTable('Follower', d.followers, 'Follower')}</div>`;
     }
-    if (d.other.length) body += `<div style="margin-top:12px">${personTable('Szerep nélkül', d.other)}</div>`;
+    if (d.other.length) body += `<div style="margin-top:12px">${personTable('Szerep nélkül', d.other, 'none')}</div>`;
     const count = d.isCouple ? `${d.couples.length} pár` : `${d.leaders.length} L / ${d.followers.length} F`;
-    return `<div class="card" id="div-${i}"><h2>${esc(d.name)} <small>${count}</small></h2>${body}</div>`;
+    return `<div class="card" id="div-${i}" data-i="${i}"><h2>${esc(d.name)} <small>${count}</small></h2>${body}</div>`;
   }).join('');
 
-  $('search').value = '';
+  renderChips();
+  $('search').value = filters.q;
   $('result').classList.remove('hidden');
+  applyFilters();
 }
+
+/* ===== Szűrés ===== */
+function divisionVisible(d) {
+  if (filters.type.size && !filters.type.has(d.type)) return false;
+  if (filters.level.size && !filters.level.has(d.level.key)) return false;
+  return true;
+}
+
+function highlight(cell, q) {
+  const t = cell.dataset.t;
+  if (!q) { cell.textContent = t; return; }
+  const i = t.toLowerCase().indexOf(q);
+  cell.innerHTML = i < 0 ? esc(t) : esc(t.slice(0, i)) + '<mark>' + esc(t.slice(i, i + q.length)) + '</mark>' + esc(t.slice(i + q.length));
+}
+
+function applyFilters() {
+  const q = filters.q.trim().toLowerCase();
+  const roleOnly = filters.role.size === 1 ? [...filters.role][0] : null;
+  let sL = 0, sF = 0, sC = 0, shownDivs = 0, hits = 0;
+
+  divisions.forEach((d, i) => {
+    let vis = divisionVisible(d);
+    // páros divízió csak egy szerepre szűrve is látszik (ott nincs külön oszlop)
+    const card = $('div-' + i);
+
+    // szerep: oszlopok elrejtése
+    card.querySelectorAll('[data-role]').forEach(col => {
+      col.classList.toggle('hidden', !!roleOnly && col.dataset.role !== roleOnly && col.dataset.role !== 'none');
+    });
+    const cols = card.querySelector('.cols');
+    if (cols) cols.classList.toggle('single', !!roleOnly);
+
+    // név keresés
+    let divHits = 0;
+    card.querySelectorAll('tr[data-n]').forEach(tr => {
+      const m = !q || tr.dataset.n.includes(q);
+      tr.classList.toggle('hidden', !m);
+      if (m && q && !tr.closest('[data-role].hidden')) divHits++;
+    });
+    card.querySelectorAll('.nm').forEach(c => highlight(c, q));
+    if (q && divHits === 0) vis = false;
+    if (vis) hits += divHits;
+
+    card.classList.toggle('hidden', !vis);
+    $('sumBody').querySelector(`tr[data-i="${i}"]`).classList.toggle('hidden', !divisionVisible(d));
+    if (divisionVisible(d)) {
+      sL += d.leaders.length; sF += d.followers.length; sC += d.isCouple ? d.couples.length : 0;
+    }
+    if (vis) shownDivs++;
+  });
+
+  $('sumL').textContent = sL; $('sumF').textContent = sF; $('sumC').textContent = sC || '';
+  const active = filters.type.size + filters.level.size + filters.role.size + (q ? 1 : 0);
+  $('reset').classList.toggle('hidden', !active);
+  $('filterInfo').textContent = `${shownDivs} / ${divisions.length} divízió` + (q ? ` · ${hits} találat` : '');
+  writeHash();
+}
+
+/* chip kattintás: csoporton belül VAGY, csoportok között ÉS */
+document.querySelector('.filters').addEventListener('click', e => {
+  const b = e.target.closest('.chip[data-g]');
+  if (!b) return;
+  const set = filters[b.dataset.g], k = b.dataset.k;
+  set.has(k) ? set.delete(k) : set.add(k);
+  b.setAttribute('aria-pressed', set.has(k));
+  applyFilters();
+});
+
+$('reset').addEventListener('click', () => {
+  filters.type.clear(); filters.level.clear(); filters.role.clear(); filters.q = '';
+  $('search').value = '';
+  renderChips();
+  applyFilters();
+});
+
+let searchT;
+$('search').addEventListener('input', e => {
+  clearTimeout(searchT);
+  searchT = setTimeout(() => { filters.q = e.target.value; applyFilters(); }, 120);
+});
 
 $('sumBody').addEventListener('click', e => {
   const tr = e.target.closest('tr[data-i]');
-  if (tr) $('div-' + tr.dataset.i).scrollIntoView({ behavior: 'smooth' });
-});
-
-$('search').addEventListener('input', e => {
-  const q = e.target.value.trim().toLowerCase();
-  document.querySelectorAll('#divs tr[data-n]').forEach(tr => {
-    tr.style.display = !q || tr.dataset.n.includes(q) ? '' : 'none';
-  });
+  if (tr) $('div-' + tr.dataset.i).scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
 
 $('f').addEventListener('submit', e => {
   e.preventDefault();
   const id = $('eventId').value.trim();
   if (!/^\d+$/.test(id)) return setStatus('Az event ID csak szám lehet.', true);
+  if (!current || current.eventId !== id) { filters.type.clear(); filters.level.clear(); filters.role.clear(); filters.q = ''; }
   load(id, $('refresh').checked);
 });
 
-/* Excel export */
+/* ===== Excel export (a szűrt divíziókat menti) ===== */
 function sheetName(name, used) {
-  let n = name.replace(/[\[\]:*?\/\\]/g, ' ').slice(0, 31).trim();
+  let n = name.replace(/[\[\]:*?\/\\]/g, ' ').slice(0, 31).trim() || 'lap';
   while (used.has(n)) n = n.slice(0, 30) + '_';
   used.add(n); return n;
 }
 $('xlsx').addEventListener('click', () => {
+  const vis = divisions.filter(divisionVisible);
+  const roleOnly = filters.role.size === 1 ? [...filters.role][0] : null;
   const wb = XLSX.utils.book_new(), used = new Set();
   const add = (aoa, name) => XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), sheetName(name, used));
-  add([['Rajtszám', 'Név', 'Divízió', 'Szerep', 'Partner'], ...current.rows.map(r => [r.bib, r.name, r.competition, r.role, r.partner])], 'bib');
-  add([['Divízió', 'Leader', 'Follower', 'Pár'], ...divisions.map(d => [d.name, d.leaders.length, d.followers.length, d.isCouple ? d.couples.length : ''])], 'összesítés');
-  divisions.forEach(d => {
+  const visNames = new Set(vis.map(d => d.name));
+  add([['Rajtszám', 'Név', 'Divízió', 'Szerep', 'Partner'],
+       ...current.rows.filter(r => visNames.has((r.competition || '').trim()) && (!roleOnly || r.role === roleOnly))
+         .map(r => [r.bib, r.name, r.competition, r.role, r.partner])], 'bib');
+  add([['Divízió', 'Leader', 'Follower', 'Pár'], ...vis.map(d => [d.name, d.leaders.length, d.followers.length, d.isCouple ? d.couples.length : ''])], 'összesítés');
+  vis.forEach(d => {
     if (d.isCouple) {
       add([['#', 'Leader', 'Follower'], ...d.couples.map(c => [c.bib, c.leader, c.follower])], d.name);
+    } else if (roleOnly) {
+      const list = roleOnly === 'Leader' ? d.leaders : d.followers;
+      add([['#', roleOnly], ...list.map(r => [r.bib, r.name])], d.name);
     } else {
       const n = Math.max(d.leaders.length, d.followers.length), aoa = [['#', 'Leader', '', '#', 'Follower']];
       for (let i = 0; i < n; i++) {
@@ -240,10 +425,11 @@ $('xlsx').addEventListener('click', () => {
       add(aoa, d.name);
     }
   });
-  XLSX.writeFile(wb, `event_${current.eventId}.xlsx`);
+  const suffix = vis.length < divisions.length || roleOnly ? '_szurt' : '';
+  XLSX.writeFile(wb, `event_${current.eventId}${suffix}.xlsx`);
 });
 
-/* Közös Google Sheet: eseményenként egy, mindenki ugyanazt látja */
+/* ===== Közös Google Sheet ===== */
 function renderSheet(sheet) {
   const box = $('sheetBox');
   if (sheet && sheet.url) {
@@ -260,27 +446,30 @@ function renderSheet(sheet) {
 async function loadKnown() {
   try {
     const data = await api({ action: 'list' });
-    if (!data.events.length) return;
-    $('knownList').innerHTML = data.events.map(ev =>
-      `<button class="chip" data-ev="${esc(ev.eventId)}" title="${esc(ev.count)} versenyző">${esc(ev.eventId)}</button>`).join(' ');
+    const evs = (data.events || []).filter(ev => ev && ev.eventId);
+    if (!evs.length) return $('known').classList.add('hidden');
+    $('knownList').innerHTML = evs.map(ev =>
+      `<button type="button" class="chip" data-ev="${esc(ev.eventId)}">${esc(ev.eventId)}${ev.count ? ` <span class="n">${esc(ev.count)} fő</span>` : ''}</button>`).join('');
     $('known').classList.remove('hidden');
   } catch (e) { /* nem kritikus */ }
 }
 $('knownList').addEventListener('click', e => {
   const b = e.target.closest('[data-ev]');
-  if (b) { $('eventId').value = b.dataset.ev; load(b.dataset.ev, false); }
+  if (!b) return;
+  $('eventId').value = b.dataset.ev;
+  filters.type.clear(); filters.level.clear(); filters.role.clear(); filters.q = '';
+  load(b.dataset.ev, false);
 });
 
 $('sheet').addEventListener('click', async () => {
   $('sheet').disabled = true;
   setStatus(current.sheet ? 'Google Sheet frissítése…' : 'Google Sheet készül…');
   try {
-    // friss adatokkal írjuk, ha a meglévő táblázatot frissítjük
     const params = { event: current.eventId, action: 'sheet' };
     if (current.sheet) params.refresh = '1';
     const data = await api(params);
-    current.sheet = data.sheet;
     if (params.refresh) { current = data; divisions = buildDivisions(current.rows); render(); }
+    else current.sheet = data.sheet;
     renderSheet(data.sheet);
     setStatus('Kész.');
     window.open(data.sheet.url, '_blank', 'noopener');
@@ -294,12 +483,12 @@ $('sheet').addEventListener('click', async () => {
 
 $('copyLink').addEventListener('click', async () => {
   await navigator.clipboard.writeText(location.href);
-  setStatus('Link a vágólapon – aki megnyitja, rögtön ezt az eseményt látja.');
+  setStatus('Link a vágólapon – a beállított szűrőkkel együtt nyílik meg.');
 });
 
-/* #438 a címben → automatikus betöltés (megosztható link) */
+/* ===== Indulás ===== */
 loadKnown();
-const fromHash = location.hash.replace('#', '');
+const fromHash = readHash();
 if (/^\d+$/.test(fromHash)) { $('eventId').value = fromHash; load(fromHash, false); }
 </script>
 </body>
