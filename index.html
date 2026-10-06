@@ -110,6 +110,11 @@
   .ev .s { grid-column: 1; color: var(--muted); font-size: 13px; }
   .ev .go { grid-row: 1 / span 2; grid-column: 2; color: var(--muted); font-size: 20px; }
   .empty-list { color: var(--muted); font-size: 14px; margin: 0 4px; }
+  .empty-list button { margin-top: 10px; height: 40px; padding: 0 16px; border-radius: 999px;
+                       border: 1px solid var(--line); background: var(--surface); font-weight: 700; }
+  .listload { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 14px; margin: 4px 4px 12px; }
+  .listload i { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent);
+                animation: spin .8s linear infinite; }
 
   /* ---------- esemény nézet: fejléc ---------- */
   .appbar { position: sticky; top: 0; z-index: 21; background: var(--bg);
@@ -252,6 +257,7 @@
     </form>
     <div class="listhead"><h2>Események</h2><span class="count num" id="evCount"></span></div>
     <input class="evfilter hidden" id="evFilter" placeholder="Esemény keresése" aria-label="Esemény keresése">
+    <div class="listload hidden" id="evLoading"><i></i>Események betöltése…</div>
     <div class="evlist" id="evList"></div>
     <p class="empty-list hidden" id="evEmpty">Még nincs lekért esemény. Írd be egy scoring.dance esemény ID-ját: a címben az /events/ utáni szám.</p>
   </aside>
@@ -307,7 +313,7 @@
 
 <script>
 /* ===== BEÁLLÍTÁS: az Apps Script webapp URL-je ===== */
-const API_URL = 'https://script.google.com/macros/s/AKfycbwjachnu0pwyKuPuMEM05Lv9zIMmNrxzSYSZOWuKnEwWgGvIviarYN80xl5wTYTB2Yd/exec';
+const API_URL = 'https://script.google.com/macros/s/IDE_JON_A_DEPLOYMENT_ID/exec';
 
 /* ===== Divízió-felismerés ===== */
 const LEVEL_DEFS = [
@@ -357,10 +363,19 @@ let current = null, divisions = [], knownEvents = [], loadToken = 0;
 const filters = { div: null, role: '', q: '' };
 function clearFilters() { filters.div = null; filters.role = ''; filters.q = ''; }
 
-async function api(params) {
-  const res = await fetch(API_URL + '?' + new URLSearchParams(params));
+async function api(params, timeoutMs) {
+  const ctl = new AbortController();
+  const t = timeoutMs ? setTimeout(() => ctl.abort(), timeoutMs) : null;
+  let res;
+  try {
+    res = await fetch(API_URL + '?' + new URLSearchParams(params), { signal: ctl.signal });
+  } catch (e) {
+    throw new Error(e.name === 'AbortError' ? 'A szerver túl sokáig nem válaszolt.' : 'Nincs kapcsolat a szerverrel. Ellenőrizd az internetet.');
+  } finally { if (t) clearTimeout(t); }
   if (!res.ok) throw new Error('A szerver nem válaszolt (HTTP ' + res.status + ').');
-  const data = await res.json();
+  let data;
+  try { data = await res.json(); }
+  catch (e) { throw new Error('A szerver nem adatot küldött vissza (valószínűleg Google bejelentkezési oldalt). Próbáld meg inkognitó ablakban, vagy jelentkezz ki a többi Google-fiókból.'); }
   if (!data.ok) throw new Error(data.error || 'Ismeretlen hiba.');
   return data;
 }
@@ -653,29 +668,48 @@ addEventListener('popstate', () => {
 });
 
 /* ===== Eseménylista ===== */
+const LIST_KEY = 'wcs-evlist-v1';
+function renderKnown(list) {
+  const label = ev => ev.eventName || 'Event ' + ev.eventId;
+  knownEvents = (list || []).filter(ev => ev && ev.eventId)
+    .sort((a, b) => label(a).localeCompare(label(b), 'hu', { sensitivity: 'base', numeric: true }));
+  $('evCount').textContent = knownEvents.length || '';
+  $('evFilter').classList.toggle('hidden', knownEvents.length < 8);
+  $('evList').innerHTML = knownEvents.map(ev =>
+    `<button class="ev" data-ev="${esc(ev.eventId)}" data-s="${esc((label(ev) + ' ' + ev.eventId).toLowerCase())}">` +
+    `<span class="t">${esc(label(ev))}</span>` +
+    `<span class="s num">${ev.count ? esc(ev.count) + ' versenyző, ' : ''}#${esc(ev.eventId)}</span>` +
+    `<span class="go" aria-hidden="true">›</span></button>`).join('');
+  markActive();
+  filterEvents();
+  if (current && !current.eventName) {
+    const k = knownEvents.find(e => e.eventId === current.eventId);
+    if (k && k.eventName) { current.eventName = k.eventName; $('evTitle').textContent = k.eventName; document.title = k.eventName; }
+  }
+}
+
 async function loadKnown() {
+  // 1) azonnal: az előző látogatásból mentett lista (ha van)
+  let cached = null;
+  try { cached = JSON.parse(localStorage.getItem(LIST_KEY) || 'null'); } catch (e) {}
+  if (cached && !knownEvents.length) renderKnown(cached);
+  $('evLoading').classList.toggle('hidden', knownEvents.length > 0);
+  $('evEmpty').classList.add('hidden');
+  // 2) frissen a szerverről
   try {
-    const data = await api({ action: 'list' });
-    const label = ev => ev.eventName || 'Event ' + ev.eventId;
-    knownEvents = (data.events || []).filter(ev => ev && ev.eventId)
-      .sort((a, b) => label(a).localeCompare(label(b), 'hu', { sensitivity: 'base', numeric: true }));
-    $('evCount').textContent = knownEvents.length || '';
+    const data = await api({ action: 'list' }, 45000);
+    renderKnown(data.events);
+    try { localStorage.setItem(LIST_KEY, JSON.stringify(data.events || [])); } catch (e) {}
+    $('evEmpty').innerHTML = 'Még nincs lekért esemény. Írd be egy scoring.dance esemény ID-ját: a címben az /events/ utáni szám.';
     $('evEmpty').classList.toggle('hidden', knownEvents.length > 0);
-    $('evFilter').classList.toggle('hidden', knownEvents.length < 8);
-    $('evList').innerHTML = knownEvents.map(ev =>
-      `<button class="ev" data-ev="${esc(ev.eventId)}" data-s="${esc((label(ev) + ' ' + ev.eventId).toLowerCase())}">` +
-      `<span class="t">${esc(label(ev))}</span>` +
-      `<span class="s num">${ev.count ? esc(ev.count) + ' versenyző, ' : ''}#${esc(ev.eventId)}</span>` +
-      `<span class="go" aria-hidden="true">›</span></button>`).join('');
-    markActive();
-    filterEvents();
-    if (current && !current.eventName) {
-      const k = knownEvents.find(e => e.eventId === current.eventId);
-      if (k && k.eventName) { current.eventName = k.eventName; $('evTitle').textContent = k.eventName; document.title = k.eventName; }
-    }
   } catch (e) {
-    $('evEmpty').classList.remove('hidden');
-    $('evEmpty').textContent = 'Az eseménylista most nem tölthető be. Event ID-val továbbra is megnyithatsz eseményt.';
+    if (!knownEvents.length) {
+      $('evEmpty').innerHTML = `Az eseménylista nem töltődött be. ${esc(e.message)}<br><button type="button" id="evRetry">Újrapróbálás</button>`;
+      $('evEmpty').classList.remove('hidden');
+      $('evRetry').onclick = loadKnown;
+    }
+  } finally {
+    $('evLoading').classList.add('hidden');
   }
 }
 function markActive() {
