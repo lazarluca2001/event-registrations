@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WCS nevezési lista</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg: #f6f7f4; --card: #ffffff; --ink: #1d2320; --muted: #66706a;
+    --line: #dde2dc; --accent: #2f7a4f; --accent-soft: #e3f0e6; --warn: #b4531f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #131614; --card: #1c201d; --ink: #e8ece9; --muted: #98a29b;
+            --line: #2f3631; --accent: #6cc28f; --accent-soft: #233a2b; --warn: #f0a070; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  input[type=text] { font: inherit; padding: 9px 12px; border: 1px solid var(--line);
+         border-radius: 8px; background: var(--card); color: var(--ink); width: 160px; }
+  button { font: inherit; padding: 9px 14px; border-radius: 8px; border: 1px solid var(--line);
+           background: var(--card); color: var(--ink); cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  label.chk { color: var(--muted); display: flex; gap: 6px; align-items: center; }
+  #status { margin: 16px 0; color: var(--muted); min-height: 1.4em; }
+  #status.err { color: var(--warn); }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 20px; align-items: center; }
+  .toolbar input { width: 220px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+          padding: 16px; margin-bottom: 16px; }
+  .card h2 { font-size: 16px; margin: 0 0 12px; display: flex; justify-content: space-between; gap: 8px; }
+  .card h2 small { color: var(--muted); font-weight: 400; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 13px; color: var(--muted); font-weight: 600; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; width: 3.5em; color: var(--muted); }
+  .summary td.num { color: var(--ink); width: auto; }
+  .summary tr { cursor: pointer; }
+  .summary tr:hover td { background: var(--accent-soft); }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 640px) { .cols { grid-template-columns: 1fr; } }
+  .tag { font-size: 12px; color: var(--muted); }
+  .hidden { display: none; }
+  a { color: var(--accent); }
+  .known { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .chip { font: inherit; font-size: 13px; padding: 4px 10px; border-radius: 999px;
+          border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; }
+  .chip:hover { border-color: var(--accent); }
+  .sheetbox { background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 10px;
+              padding: 10px 14px; margin-bottom: 16px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>WCS nevezési lista</h1>
+  <p class="sub">Írd be a scoring.dance esemény ID-ját (pl. a <code>scoring.dance/…/events/<b>438</b>/…</code> címből).</p>
+
+  <form id="f">
+    <input type="text" id="eventId" placeholder="Event ID" inputmode="numeric" required>
+    <button class="primary" type="submit" id="go">Lekérés</button>
+    <label class="chk"><input type="checkbox" id="refresh"> friss adat (cache nélkül)</label>
+  </form>
+
+  <div id="known" class="known hidden">
+    <span class="tag">Már elkészült táblázatok:</span>
+    <span id="knownList"></span>
+  </div>
+
+  <div id="status"></div>
+
+  <div id="sheetBox" class="sheetbox hidden"></div>
+
+  <div id="result" class="hidden">
+    <div class="toolbar">
+      <input type="text" id="search" placeholder="Keresés névre…">
+      <button id="xlsx">Letöltés .xlsx</button>
+      <button id="sheet">Google Sheet létrehozása</button>
+      <button id="copyLink">Link másolása</button>
+      <span id="meta" class="tag"></span>
+    </div>
+    <div class="card">
+      <h2>Összesítés <small id="totals"></small></h2>
+      <table class="summary"><thead><tr><th>Divízió</th><th class="num">Leader</th><th class="num">Follower</th><th class="num">Pár</th></tr></thead><tbody id="sumBody"></tbody></table>
+    </div>
+    <div id="divs"></div>
+  </div>
+</div>
+
+<script>
+/* ===== BEÁLLÍTÁS: ide jön az Apps Script webapp URL-je ===== */
+const API_URL = 'https://script.google.com/macros/s/IDE_JON_A_DEPLOYMENT_ID/exec';
+
+/* ===== Divízió-logika (ugyanaz, mint a Code.gs-ben) ===== */
+const LEVELS = [/newcomer/i, /novice/i, /intermediate|\binter\b/i, /advanced/i,
+  /all[\s-]?stars?/i, /champion/i, /sophisticated/i, /masters?/i, /junior/i, /invitational/i];
+function divisionOrder(name) {
+  const idx = LEVELS.findIndex(re => re.test(name));
+  return (/strictly/i.test(name) ? 100 : 0) + (idx < 0 ? 50 : idx);
+}
+function buildDivisions(rows) {
+  const map = new Map();
+  rows.forEach(r => { if (!map.has(r.competition)) map.set(r.competition, []); map.get(r.competition).push(r); });
+  const byBib = (a, b) => a.bib - b.bib;
+  const norm = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  return [...map.entries()].map(([name, list]) => {
+    const withPartner = list.filter(r => r.partner).length;
+    const isCouple = /strictly/i.test(name) || (list.length >= 4 && withPartner / list.length >= 0.8);
+    const leaders = list.filter(r => r.role === 'Leader').sort(byBib);
+    const followers = list.filter(r => r.role === 'Follower').sort(byBib);
+    const other = list.filter(r => r.role !== 'Leader' && r.role !== 'Follower').sort(byBib);
+    const couples = [];
+    if (isCouple) {
+      const seen = new Set();
+      leaders.forEach(l => { couples.push({ bib: l.bib, leader: l.name, follower: l.partner }); seen.add(norm(l.name) + '|' + norm(l.partner)); });
+      followers.forEach(f => {
+        const key = norm(f.partner) + '|' + norm(f.name);
+        if (!seen.has(key)) { couples.push({ bib: f.bib, leader: f.partner, follower: f.name, followerOnly: true }); seen.add(key); }
+      });
+      couples.sort(byBib);
+    }
+    return { name, order: divisionOrder(name), isCouple, leaders, followers, other, couples };
+  }).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+}
+
+/* ===== UI ===== */
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+let current = null, divisions = [];
+
+function setStatus(msg, isErr) { $('status').textContent = msg; $('status').className = isErr ? 'err' : ''; }
+
+async function api(params) {
+  const url = API_URL + '?' + new URLSearchParams(params);
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || 'Ismeretlen hiba');
+  return data;
+}
+
+async function load(eventId, refresh) {
+  $('go').disabled = true;
+  $('result').classList.add('hidden');
+  const t0 = Date.now();
+  const timer = setInterval(() => setStatus(`Lekérés folyamatban… ${Math.round((Date.now() - t0) / 1000)} mp (első lekérésnél 1–3 perc is lehet)`), 1000);
+  try {
+    const params = { event: eventId };
+    if (refresh) params.refresh = '1';
+    current = await api(params);
+    divisions = buildDivisions(current.rows);
+    render();
+    renderSheet(current.sheet);
+    setStatus('');
+    history.replaceState(null, '', '#' + eventId);
+  } catch (e) {
+    setStatus('Hiba: ' + e.message, true);
+  } finally {
+    clearInterval(timer);
+    $('go').disabled = false;
+  }
+}
+
+function personTable(title, list) {
+  return `<div><table><thead><tr><th class="num">#</th><th>${esc(title)} (${list.length})</th></tr></thead><tbody>` +
+    list.map(r => `<tr data-n="${esc(r.name.toLowerCase())}"><td class="num">${r.bib}</td><td>${esc(r.name)}${r.partner ? ` <span class="tag">· ${esc(r.partner)}</span>` : ''}</td></tr>`).join('') +
+    `</tbody></table></div>`;
+}
+
+function render() {
+  const when = new Date(current.fetchedAt).toLocaleString('hu-HU');
+  $('meta').textContent = `Event ${current.eventId} · lekérve: ${when}`;
+  $('totals').textContent = `${current.count} versenyző · ${current.rows.length} nevezés`;
+
+  $('sumBody').innerHTML = divisions.map((d, i) =>
+    `<tr data-i="${i}"><td>${esc(d.name)}</td><td class="num">${d.leaders.length}</td><td class="num">${d.followers.length}</td><td class="num">${d.isCouple ? d.couples.length : ''}</td></tr>`).join('');
+
+  $('divs').innerHTML = divisions.map((d, i) => {
+    let body;
+    if (d.isCouple) {
+      body = `<table><thead><tr><th class="num">#</th><th>Leader</th><th>Follower</th></tr></thead><tbody>` +
+        d.couples.map(c => `<tr data-n="${esc((c.leader + ' ' + c.follower).toLowerCase())}"><td class="num">${c.bib}</td><td>${esc(c.leader)}</td><td>${esc(c.follower)}${c.followerOnly ? ' <span class="tag">(csak a follower nevezett)</span>' : ''}</td></tr>`).join('') +
+        `</tbody></table>`;
+    } else {
+      body = `<div class="cols">${personTable('Leader', d.leaders)}${personTable('Follower', d.followers)}</div>`;
+    }
+    if (d.other.length) body += `<div style="margin-top:12px">${personTable('Szerep nélkül', d.other)}</div>`;
+    const count = d.isCouple ? `${d.couples.length} pár` : `${d.leaders.length} L / ${d.followers.length} F`;
+    return `<div class="card" id="div-${i}"><h2>${esc(d.name)} <small>${count}</small></h2>${body}</div>`;
+  }).join('');
+
+  $('search').value = '';
+  $('result').classList.remove('hidden');
+}
+
+$('sumBody').addEventListener('click', e => {
+  const tr = e.target.closest('tr[data-i]');
+  if (tr) $('div-' + tr.dataset.i).scrollIntoView({ behavior: 'smooth' });
+});
+
+$('search').addEventListener('input', e => {
+  const q = e.target.value.trim().toLowerCase();
+  document.querySelectorAll('#divs tr[data-n]').forEach(tr => {
+    tr.style.display = !q || tr.dataset.n.includes(q) ? '' : 'none';
+  });
+});
+
+$('f').addEventListener('submit', e => {
+  e.preventDefault();
+  const id = $('eventId').value.trim();
+  if (!/^\d+$/.test(id)) return setStatus('Az event ID csak szám lehet.', true);
+  load(id, $('refresh').checked);
+});
+
+/* Excel export */
+function sheetName(name, used) {
+  let n = name.replace(/[\[\]:*?\/\\]/g, ' ').slice(0, 31).trim();
+  while (used.has(n)) n = n.slice(0, 30) + '_';
+  used.add(n); return n;
+}
+$('xlsx').addEventListener('click', () => {
+  const wb = XLSX.utils.book_new(), used = new Set();
+  const add = (aoa, name) => XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), sheetName(name, used));
+  add([['Rajtszám', 'Név', 'Divízió', 'Szerep', 'Partner'], ...current.rows.map(r => [r.bib, r.name, r.competition, r.role, r.partner])], 'bib');
+  add([['Divízió', 'Leader', 'Follower', 'Pár'], ...divisions.map(d => [d.name, d.leaders.length, d.followers.length, d.isCouple ? d.couples.length : ''])], 'összesítés');
+  divisions.forEach(d => {
+    if (d.isCouple) {
+      add([['#', 'Leader', 'Follower'], ...d.couples.map(c => [c.bib, c.leader, c.follower])], d.name);
+    } else {
+      const n = Math.max(d.leaders.length, d.followers.length), aoa = [['#', 'Leader', '', '#', 'Follower']];
+      for (let i = 0; i < n; i++) {
+        const l = d.leaders[i], f = d.followers[i];
+        aoa.push([l ? l.bib : '', l ? l.name : '', '', f ? f.bib : '', f ? f.name : '']);
+      }
+      add(aoa, d.name);
+    }
+  });
+  XLSX.writeFile(wb, `event_${current.eventId}.xlsx`);
+});
+
+/* Közös Google Sheet: eseményenként egy, mindenki ugyanazt látja */
+function renderSheet(sheet) {
+  const box = $('sheetBox');
+  if (sheet && sheet.url) {
+    const when = new Date(sheet.updatedAt).toLocaleString('hu-HU');
+    box.innerHTML = `📄 Ehhez az eseményhez már van közös táblázat: <a href="${esc(sheet.url)}" target="_blank" rel="noopener"><b>Google Sheet megnyitása</b></a> <span class="tag">· utoljára frissítve: ${esc(when)}</span>`;
+    box.classList.remove('hidden');
+    $('sheet').textContent = 'Google Sheet frissítése';
+  } else {
+    box.classList.add('hidden');
+    $('sheet').textContent = 'Google Sheet létrehozása';
+  }
+}
+
+async function loadKnown() {
+  try {
+    const data = await api({ action: 'list' });
+    if (!data.events.length) return;
+    $('knownList').innerHTML = data.events.map(ev =>
+      `<button class="chip" data-ev="${esc(ev.eventId)}" title="${esc(ev.count)} versenyző">${esc(ev.eventId)}</button>`).join(' ');
+    $('known').classList.remove('hidden');
+  } catch (e) { /* nem kritikus */ }
+}
+$('knownList').addEventListener('click', e => {
+  const b = e.target.closest('[data-ev]');
+  if (b) { $('eventId').value = b.dataset.ev; load(b.dataset.ev, false); }
+});
+
+$('sheet').addEventListener('click', async () => {
+  $('sheet').disabled = true;
+  setStatus(current.sheet ? 'Google Sheet frissítése…' : 'Google Sheet készül…');
+  try {
+    // friss adatokkal írjuk, ha a meglévő táblázatot frissítjük
+    const params = { event: current.eventId, action: 'sheet' };
+    if (current.sheet) params.refresh = '1';
+    const data = await api(params);
+    current.sheet = data.sheet;
+    if (params.refresh) { current = data; divisions = buildDivisions(current.rows); render(); }
+    renderSheet(data.sheet);
+    setStatus('Kész.');
+    window.open(data.sheet.url, '_blank', 'noopener');
+    loadKnown();
+  } catch (e) {
+    setStatus('Hiba: ' + e.message, true);
+  } finally {
+    $('sheet').disabled = false;
+  }
+});
+
+$('copyLink').addEventListener('click', async () => {
+  await navigator.clipboard.writeText(location.href);
+  setStatus('Link a vágólapon – aki megnyitja, rögtön ezt az eseményt látja.');
+});
+
+/* #438 a címben → automatikus betöltés (megosztható link) */
+loadKnown();
+const fromHash = location.hash.replace('#', '');
+if (/^\d+$/.test(fromHash)) { $('eventId').value = fromHash; load(fromHash, false); }
+</script>
+</body>
+</html>
