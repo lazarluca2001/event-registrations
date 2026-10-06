@@ -5,9 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1d1430" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#f6f1fa" media="(prefers-color-scheme: light)">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Nevezések">
+<meta name="description" content="WCS versenyek nevezési listái divíziónként, a scoring.dance adataiból.">
 <title>Nevezések</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&display=swap" rel="stylesheet">
@@ -28,6 +34,7 @@
     --paper-ink: #1d1430;
     --hit: #ffd84d;
     --hit-soft: rgba(255, 216, 77, .28);
+    --scrim: rgba(20, 12, 36, .45);
     --shadow: 0 1px 2px rgba(29, 20, 48, .06), 0 6px 20px rgba(29, 20, 48, .06);
     --r-sm: 8px; --r-md: 14px; --r-lg: 22px;
     --font: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
@@ -49,6 +56,7 @@
       --paper: #fff3d1;
       --hit: #ffd84d;
       --hit-soft: rgba(255, 216, 77, .16);
+      --scrim: rgba(8, 4, 16, .6);
       --shadow: 0 1px 2px rgba(0, 0, 0, .25), 0 8px 24px rgba(0, 0, 0, .25);
     }
   }
@@ -60,12 +68,15 @@
     font: 16px/1.4 var(--font); font-variation-settings: "wdth" 100;
     -webkit-font-smoothing: antialiased;
   }
+  body.sheet-open { overflow: hidden; }
   button, input { font: inherit; color: inherit; }
   button { cursor: pointer; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .hidden { display: none !important; }
   .num { font-variant-numeric: tabular-nums; }
-  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+  @media (prefers-reduced-motion: reduce) {
+    *, ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; transition: none !important; }
+  }
 
   /* ---------- elrendezés ---------- */
   .app { min-height: 100dvh; }
@@ -81,7 +92,7 @@
     body:not(.on-event) .main { display: none; }
   }
 
-  /* ---------- eseménylista (kezdőképernyő / oldalsáv) ---------- */
+  /* ---------- kezdőképernyő / oldalsáv ---------- */
   .brand { display: flex; align-items: baseline; gap: 10px; margin: 0 4px 18px; }
   .brand h1 { margin: 0; font-size: 30px; line-height: 1; font-weight: 800; letter-spacing: -.02em;
               font-variation-settings: "wdth" 80, "opsz" 96; }
@@ -98,6 +109,8 @@
   .listhead { display: flex; justify-content: space-between; align-items: center; margin: 0 4px 10px; }
   .listhead h2 { margin: 0; font-size: 17px; font-weight: 700; }
   .listhead .count { color: var(--muted); font-size: 14px; }
+  .subhead { margin: 18px 4px 8px; font-size: 14px; color: var(--muted); font-weight: 600; }
+  .subhead:first-child { margin-top: 0; }
   .evfilter { width: 100%; height: 40px; padding: 0 14px; margin-bottom: 10px; border-radius: 999px;
               border: 1px solid var(--line); background: var(--surface); }
   .evlist { display: flex; flex-direction: column; gap: 8px; }
@@ -106,34 +119,52 @@
         background: var(--surface); }
   .ev:hover { border-color: var(--accent); }
   .ev.active { border-color: var(--accent); box-shadow: inset 4px 0 0 var(--accent); }
+  .ev.closed { background: transparent; }
+  .ev.closed .t { color: var(--muted); }
   .ev .t { font-weight: 700; font-size: 16px; line-height: 1.25; }
-  .ev .s { grid-column: 1; color: var(--muted); font-size: 13px; }
+  .ev .s { grid-column: 1; color: var(--muted); font-size: 13px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .ev .live { display: inline-flex; align-items: center; gap: 5px; color: var(--lead); font-weight: 600; }
+  .ev .live::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
   .ev .go { grid-row: 1 / span 2; grid-column: 2; color: var(--muted); font-size: 20px; }
   .empty-list { color: var(--muted); font-size: 14px; margin: 0 4px; }
-  .empty-list button { margin-top: 10px; height: 40px; padding: 0 16px; border-radius: 999px;
+  .empty-list button, .ghostbtn { margin-top: 10px; height: 40px; padding: 0 16px; border-radius: 999px;
                        border: 1px solid var(--line); background: var(--surface); font-weight: 700; }
   .listload { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 14px; margin: 4px 4px 12px; }
   .listload i { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent);
                 animation: spin .8s linear infinite; }
 
+  /* követett nevek */
+  .people { margin: 0 0 24px; padding: 14px; border-radius: var(--r-lg); background: var(--surface); border: 1px solid var(--line); }
+  .people h2 { margin: 0 0 4px; font-size: 17px; }
+  .people p { margin: 0 0 10px; font-size: 13.5px; color: var(--muted); }
+  .pchips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .pchips:empty { display: none; }
+  .pchip { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 6px 0 12px; border-radius: 999px;
+           background: var(--surface-2); font-size: 14px; }
+  .pchip .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--c); flex: none; }
+  .pchip em { font-style: normal; font-size: 12px; color: var(--muted); }
+  .pchip button { width: 26px; height: 26px; border: none; border-radius: 50%; background: transparent; color: var(--muted); font-size: 16px; line-height: 1; }
+  .pchip button:hover { background: var(--line); }
+  .padd { display: flex; gap: 6px; }
+  .padd input { flex: 1; min-width: 0; height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); }
+  .padd button { height: 40px; padding: 0 14px; border-radius: 999px; border: none; background: var(--ink); color: var(--bg); font-weight: 700; }
+
   /* ---------- esemény nézet: fejléc ---------- */
   .appbar { position: sticky; top: 0; z-index: 21; background: var(--bg);
             padding: calc(8px + var(--top)) 12px 4px; }
-  .barrow { display: flex; align-items: center; gap: 8px; min-height: 52px; }
+  .barrow { display: flex; align-items: center; gap: 4px; min-height: 52px; }
   .iconbtn { width: 42px; height: 42px; flex: none; display: grid; place-items: center; border-radius: 50%;
              border: none; background: transparent; }
   .iconbtn:hover { background: var(--surface-2); }
   .iconbtn svg { width: 22px; height: 22px; }
   .iconbtn.spin svg { animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .titlebox { flex: 1; min-width: 0; }
+  .titlebox { flex: 1; min-width: 0; padding-left: 4px; }
   .titlebox h2 { margin: 0; font-size: 19px; font-weight: 800; line-height: 1.15; letter-spacing: -.01em;
                  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-                 font-variation-settings: "wdth" 85, "opsz" 48; }
+                 font-variation-settings: "wdth" 85, "opsz" 48; width: fit-content; max-width: 100%; }
   .titlebox p { margin: 1px 0 0; font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-  /* szűrők – kompakt, görgetéskor behúzódik */
-  /* a szűrősáv külön ragad a fejléc alatt; elrejtéskor csak becsúszik alá (az elrendezés nem változik) */
   .filters { position: sticky; top: var(--barh, 64px); z-index: 20; background: var(--bg);
              padding: 0 12px 10px; border-bottom: 1px solid var(--line);
              transition: transform .25s ease; }
@@ -149,6 +180,8 @@
   .chip[aria-pressed="true"] .n { color: inherit; opacity: .7; }
   .chip.has-hit::after { content: ''; position: absolute; top: -2px; right: -2px; width: 10px; height: 10px;
                          border-radius: 50%; background: var(--hit); border: 2px solid var(--bg); }
+  .chip .favdots { display: inline-flex; gap: 2px; }
+  .chip .favdots i { width: 7px; height: 7px; border-radius: 50%; background: var(--c); }
   .controls { display: flex; gap: 8px; align-items: center; }
   .seg { display: flex; flex: none; padding: 3px; border-radius: 999px; background: var(--surface-2); }
   .seg button { height: 32px; padding: 0 12px; border: none; border-radius: 999px; background: transparent;
@@ -167,12 +200,27 @@
 
   /* ---------- tartalom ---------- */
   .content { padding: 14px 12px calc(40px + var(--bottom)); max-width: 1100px; }
+  .notice { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; padding: 10px 14px; border-radius: var(--r-md);
+            background: var(--surface-2); color: var(--muted); font-size: 13.5px; }
   .stats { display: flex; gap: 8px; margin-bottom: 14px; }
   .stat { flex: 1; min-width: 0; padding: 12px 14px; border-radius: var(--r-md); background: var(--surface); border: 1px solid var(--line); }
   .stat b { display: block; font-size: 26px; line-height: 1; font-weight: 800; font-variation-settings: "wdth" 80, "opsz" 72; }
   .stat span { font-size: 13px; color: var(--muted); }
   .stat.lead b { color: var(--lead); }
   .stat.follow b { color: var(--follow); }
+
+  /* követett nevek ebben az eseményben */
+  .mine { margin-bottom: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .mine:empty { display: none; }
+  .mcard { padding: 12px 14px; border-radius: var(--r-md); background: var(--surface); border: 1px solid var(--line);
+           box-shadow: inset 4px 0 0 var(--c); }
+  .mcard .who { display: flex; align-items: center; gap: 8px; font-weight: 700; margin-bottom: 8px; }
+  .mcard .who em { font-style: normal; font-weight: 500; font-size: 13px; color: var(--muted); }
+  .mcard .ents { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ent { height: 32px; padding: 0 11px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg);
+         font-size: 13.5px; display: inline-flex; align-items: center; gap: 6px; }
+  .ent .r { width: 8px; height: 8px; border-radius: 50%; }
+  .ent .r.L { background: var(--lead); } .ent .r.F { background: var(--follow); } .ent .r.C { background: var(--accent); }
 
   /* divízió-áttekintő egyensúlysávokkal */
   .overview { display: flex; flex-direction: column; gap: 6px; margin-bottom: 22px; }
@@ -208,8 +256,9 @@
   .group.follow { border-top: 3px solid var(--follow); }
   .group.couple { border-top: 3px solid var(--accent); }
   .rows { list-style: none; margin: 0; padding: 0 6px 6px; }
-  .row { display: flex; align-items: center; gap: 12px; padding: 7px 10px; border-radius: var(--r-sm); }
+  .row { display: flex; align-items: center; gap: 12px; padding: 7px 10px; border-radius: var(--r-sm); cursor: pointer; scroll-margin: 180px 0 120px; }
   .row + .row { border-top: 1px solid var(--line); }
+  .row:hover { background: var(--surface-2); }
   .row .who { min-width: 0; flex: 1; font-size: 16px; line-height: 1.25; }
   .row .who small { display: block; font-size: 13.5px; color: var(--muted); }
   .row .who small::before { content: '+ '; color: var(--follow); font-weight: 700; }
@@ -217,6 +266,13 @@
   .row.hit { background: var(--hit-soft); border-top-color: transparent; }
   .row.hit + .row { border-top-color: transparent; }
   .row.cur { box-shadow: inset 0 0 0 2px var(--hit); }
+  .row.fav { box-shadow: inset 4px 0 0 var(--c); }
+  .row.fav.cur { box-shadow: inset 4px 0 0 var(--c), inset 0 0 0 2px var(--hit); }
+  .nm.fav { font-weight: 700; }
+  .nm.fav::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%;
+                    background: var(--c); vertical-align: middle; position: relative; top: -1px; }
+  .row.flash { animation: flash 1.4s ease; }
+  @keyframes flash { 0%, 40% { background: var(--hit-soft); } 100% { background: transparent; } }
   mark { background: var(--hit); color: #1d1430; border-radius: 3px; padding: 0 1px; }
 
   /* a rajtszám: papír versenyszám tűlyukakkal */
@@ -228,6 +284,42 @@
   .bib::before, .bib::after { content: ''; position: absolute; top: 3px; width: 4px; height: 4px; border-radius: 50%;
                               background: var(--surface); box-shadow: inset 0 0 0 1px rgba(29,20,48,.2); }
   .bib::before { left: 4px; } .bib::after { right: 4px; }
+  .bib.big { min-width: 78px; height: 56px; padding-top: 16px; font-size: 30px; border-radius: 8px; }
+  .bib.big::before, .bib.big::after { top: 6px; width: 6px; height: 6px; }
+  .bib.big::before { left: 8px; } .bib.big::after { right: 8px; }
+
+  /* ---------- versenyző-adatlap (alulról felcsúszó lap) ---------- */
+  .scrim { position: fixed; inset: 0; z-index: 50; background: var(--scrim); opacity: 0; transition: opacity .2s ease; }
+  .scrim.show { opacity: 1; }
+  .sheet { position: fixed; z-index: 51; left: 0; right: 0; bottom: 0; max-height: 86dvh; overflow-y: auto;
+           background: var(--surface); border-radius: 24px 24px 0 0; padding: 10px 18px calc(22px + var(--bottom));
+           box-shadow: 0 -8px 40px rgba(0,0,0,.25); transform: translateY(105%); transition: transform .28s cubic-bezier(.2,.8,.2,1); }
+  .sheet.show { transform: translateY(0); }
+  @media (min-width: 700px) { .sheet { left: 50%; right: auto; width: 520px; margin-left: -260px; } }
+  .grab { width: 40px; height: 5px; border-radius: 999px; background: var(--line); margin: 0 auto 14px; }
+  .phead { display: flex; gap: 14px; align-items: center; margin-bottom: 16px; }
+  .phead h3 { margin: 0; font-size: 24px; line-height: 1.1; font-weight: 800; font-variation-settings: "wdth" 85, "opsz" 72; }
+  .phead p { margin: 4px 0 0; font-size: 13.5px; color: var(--muted); }
+  .plist { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .plist li { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-radius: var(--r-md); background: var(--bg); }
+  .plist .d { flex: 1; min-width: 0; }
+  .plist .d b { display: block; font-size: 15px; }
+  .plist .d span { font-size: 13px; color: var(--muted); }
+  .role { flex: none; font-size: 12.5px; font-weight: 700; padding: 4px 9px; border-radius: 999px; }
+  .role.L { color: var(--lead); background: color-mix(in srgb, var(--lead) 14%, transparent); }
+  .role.F { color: var(--follow); background: color-mix(in srgb, var(--follow) 14%, transparent); }
+  .pacts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .pacts button, .pacts a { height: 46px; display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: var(--r-md);
+                            border: 1px solid var(--line); background: var(--bg); color: var(--ink); text-decoration: none; font-weight: 700; font-size: 14.5px; }
+  .pacts .primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .pacts .wide { grid-column: 1 / -1; }
+  .pacts svg { width: 18px; height: 18px; }
+
+  /* toast */
+  .toast { position: fixed; z-index: 60; left: 50%; bottom: calc(24px + var(--bottom)); transform: translate(-50%, 20px); opacity: 0;
+           background: var(--ink); color: var(--bg); padding: 11px 18px; border-radius: 999px; font-size: 14.5px; font-weight: 600;
+           transition: opacity .2s ease, transform .2s ease; pointer-events: none; max-width: calc(100% - 32px); text-align: center; }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
   /* állapotok */
   .state { padding: 60px 24px; text-align: center; color: var(--muted); }
@@ -243,23 +335,45 @@
   .welcome { padding: 80px 32px; color: var(--muted); max-width: 46ch; }
   .welcome h3 { color: var(--ink); font-size: 26px; font-weight: 800; margin: 0 0 8px; }
   @media (max-width: 899px) { .welcome { display: none; } }
+
+  /* ---------- nyitó/záró átmenet (View Transitions) ---------- */
+  ::view-transition-old(root) { animation: vt-out .22s ease both; }
+  ::view-transition-new(root) { animation: vt-in .3s cubic-bezier(.2,.8,.2,1) both; }
+  html.vt-back::view-transition-old(root) { animation: vt-out-back .22s ease both; }
+  html.vt-back::view-transition-new(root) { animation: vt-in-back .3s cubic-bezier(.2,.8,.2,1) both; }
+  ::view-transition-group(evtitle) { animation-duration: .32s; animation-timing-function: cubic-bezier(.2,.8,.2,1); }
+  @keyframes vt-out { to { opacity: 0; transform: translateX(-24px); } }
+  @keyframes vt-in { from { opacity: 0; transform: translateX(32px); } }
+  @keyframes vt-out-back { to { opacity: 0; transform: translateX(24px); } }
+  @keyframes vt-in-back { from { opacity: 0; transform: translateX(-32px); } }
 </style>
 </head>
 <body>
 <div class="app">
 
-  <!-- Eseménylista: telefonon kezdőképernyő, asztalon oldalsáv -->
+  <!-- Kezdőképernyő (telefonon) / oldalsáv (asztalon) -->
   <aside class="panel" id="panel">
     <div class="brand"><h1>Nevezések</h1><span>WCS</span></div>
     <form class="idform" id="idform" autocomplete="off">
-      <input id="eventId" inputmode="numeric" placeholder="Event ID" aria-label="scoring.dance event ID">
+      <input id="eventId" inputmode="numeric" placeholder="Event ID" aria-label="scoring.dance event ID vagy link">
       <button class="btn-primary" id="go" type="submit">Megnyitás</button>
     </form>
+
+    <section class="people" aria-labelledby="peopleTitle">
+      <h2 id="peopleTitle">Követett nevek</h2>
+      <p id="peopleHint">Add meg a saját nevedet és a barátaidét: minden eseményben kiemelve látod, hol indultok.</p>
+      <div class="pchips" id="pchips"></div>
+      <form class="padd" id="padd" autocomplete="off">
+        <input id="pname" placeholder="Név, pl. Anna Kiss" aria-label="Követett név hozzáadása">
+        <button type="submit">Hozzáadás</button>
+      </form>
+    </section>
+
     <div class="listhead"><h2>Események</h2><span class="count num" id="evCount"></span></div>
     <input class="evfilter hidden" id="evFilter" placeholder="Esemény keresése" aria-label="Esemény keresése">
     <div class="listload hidden" id="evLoading"><i></i>Események betöltése…</div>
-    <div class="evlist" id="evList"></div>
-    <p class="empty-list hidden" id="evEmpty">Még nincs lekért esemény. Írd be egy scoring.dance esemény ID-ját: a címben az /events/ utáni szám.</p>
+    <div id="evList"></div>
+    <p class="empty-list hidden" id="evEmpty"></p>
   </aside>
 
   <!-- Esemény nézet -->
@@ -279,28 +393,33 @@
             <h2 id="evTitle"></h2>
             <p id="evMeta"></p>
           </div>
+          <button class="iconbtn" id="share" aria-label="Megosztás" title="Megosztás">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M7 8l5-5 5 5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>
+          </button>
           <button class="iconbtn" id="refresh" aria-label="Adatok frissítése" title="Adatok frissítése">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
           </button>
         </div>
       </header>
       <div class="filters" id="filters">
-          <div class="strip" id="strip" role="toolbar" aria-label="Divízió"></div>
-          <div class="controls">
-            <div class="seg" id="seg" role="group" aria-label="Szerep">
-              <button data-r="" aria-pressed="true">Mind</button>
-              <button data-r="Leader" aria-pressed="false">Leader</button>
-              <button data-r="Follower" aria-pressed="false">Follower</button>
-            </div>
-            <label class="find">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-              <input id="q" type="search" placeholder="Név" aria-label="Név kiemelése" enterkeyhint="next">
-            </label>
+        <div class="strip" id="strip" role="toolbar" aria-label="Divízió"></div>
+        <div class="controls">
+          <div class="seg" id="seg" role="group" aria-label="Szerep">
+            <button data-r="" aria-pressed="true">Mind</button>
+            <button data-r="Leader" aria-pressed="false">Leader</button>
+            <button data-r="Follower" aria-pressed="false">Follower</button>
           </div>
-          <p class="findinfo" id="findinfo"></p>
+          <label class="find">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+            <input id="q" type="search" placeholder="Név" aria-label="Név kiemelése" enterkeyhint="next">
+          </label>
+        </div>
+        <p class="findinfo" id="findinfo"></p>
       </div>
 
       <div class="content">
+        <div class="notice hidden" id="notice"></div>
+        <div class="mine" id="mine"></div>
         <div class="stats" id="stats"></div>
         <div class="overview" id="overview"></div>
         <div id="sections"></div>
@@ -311,9 +430,15 @@
   </main>
 </div>
 
+<!-- versenyző-adatlap -->
+<div class="scrim hidden" id="scrim"></div>
+<div class="sheet hidden" id="sheet" role="dialog" aria-modal="true" aria-labelledby="pTitle"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
 <script>
 /* ===== BEÁLLÍTÁS: az Apps Script webapp URL-je ===== */
-const API_URL = 'https://script.google.com/macros/s/AKfycbwjachnu0pwyKuPuMEM05Lv9zIMmNrxzSYSZOWuKnEwWgGvIviarYN80xl5wTYTB2Yd/exec';
+const API_URL = 'https://script.google.com/macros/s/IDE_JON_A_DEPLOYMENT_ID/exec';
+const SCORING_URL = 'https://scoring.dance/huHU/events/';
 
 /* ===== Divízió-felismerés ===== */
 const LEVEL_DEFS = [
@@ -332,7 +457,6 @@ function buildDivisions(rows) {
     map.get(name).push(r);
   });
   const byBib = (a, b) => a.bib - b.bib;
-  const norm = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
   return [...map.entries()].map(([name, list]) => {
     const strictly = /strictly/i.test(name);
     const withPartner = list.filter(r => r.partner).length;
@@ -356,9 +480,36 @@ function buildDivisions(rows) {
   .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
 }
 
-/* ===== Állapot és segédek ===== */
+/* ===== Segédek ===== */
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+// összehasonlításhoz: kisbetű, ékezet nélkül, egy szóköz
+function norm(s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim(); }
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } }
+};
+let toastT;
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600);
+}
+function relTime(iso) {
+  const d = new Date(iso); if (isNaN(d)) return '';
+  const min = Math.round((Date.now() - d) / 60000);
+  if (min < 1) return 'most';
+  if (min < 60) return min + ' perce';
+  if (min < 24 * 60 && d.getDate() === new Date().getDate()) return 'ma ' + d.toLocaleTimeString('hu-HU', { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleString('hu-HU', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+function withTransition(fn, back) {
+  if (!document.startViewTransition || reduceMotion()) { fn(); return; }
+  document.documentElement.classList.toggle('vt-back', !!back);
+  document.startViewTransition(fn);
+}
+
+/* ===== Állapot ===== */
 let current = null, divisions = [], knownEvents = [], loadToken = 0;
 const filters = { div: null, role: '', q: '' };
 function clearFilters() { filters.div = null; filters.role = ''; filters.q = ''; }
@@ -379,6 +530,60 @@ async function api(params, timeoutMs) {
   if (!data.ok) throw new Error(data.error || 'Ismeretlen hiba.');
   return data;
 }
+
+/* ===== Offline mentés: az utoljára megnyitott 6 esemény adatai a telefonon ===== */
+const EV_KEY = id => 'wcs-ev-' + id;
+function saveEventLocal(data) {
+  const lru = store.get('wcs-ev-lru', []).filter(x => x !== data.eventId);
+  lru.unshift(data.eventId);
+  while (lru.length > 6) localStorage.removeItem(EV_KEY(lru.pop()));
+  if (!store.set(EV_KEY(data.eventId), data)) { // tele a tároló: a legrégebbit töröljük
+    const old = lru.pop(); if (old) localStorage.removeItem(EV_KEY(old));
+    store.set(EV_KEY(data.eventId), data);
+  }
+  store.set('wcs-ev-lru', lru);
+}
+
+/* ===== Követett nevek ===== */
+const PCOLORS = ['#ffb020', '#4da3ff', '#c27bff', '#36d07f', '#ff7a59', '#ff5fd2', '#2ec5e8', '#e6c229'];
+let people = store.get('wcs-people-v1', []);
+function savePeople() { store.set('wcs-people-v1', people); renderPeople(); if (current) { decorateFavs(); renderMine(); } }
+function personFor(name) {
+  const n = norm(name);
+  if (!n) return null;
+  return people.find(p => { const k = norm(p.name); return k && (n === k || (k.length >= 4 && n.includes(k))); }) || null;
+}
+function addPerson(name, me) {
+  name = String(name || '').trim().replace(/\s+/g, ' ');
+  if (!name) return;
+  let p = people.find(x => norm(x.name) === norm(name));
+  if (!p) {
+    const used = new Set(people.map(x => x.color));
+    p = { name, color: PCOLORS.find(c => !used.has(c)) || PCOLORS[people.length % PCOLORS.length] };
+    people.push(p);
+  }
+  if (me) people.forEach(x => { x.me = x === p; });
+  savePeople();
+}
+function removePerson(name) { people = people.filter(p => norm(p.name) !== norm(name)); savePeople(); }
+function renderPeople() {
+  people.sort((a, b) => (b.me ? 1 : 0) - (a.me ? 1 : 0));
+  $('pchips').innerHTML = people.map(p =>
+    `<span class="pchip" style="--c:${p.color}"><span class="dot"></span>${esc(p.name)}${p.me ? ' <em>én</em>' : ''}<button type="button" data-rm="${esc(p.name)}" aria-label="${esc(p.name)} törlése">×</button></span>`).join('');
+  $('peopleHint').classList.toggle('hidden', people.length > 0);
+}
+$('padd').addEventListener('submit', e => {
+  e.preventDefault();
+  const v = $('pname').value.trim();
+  if (!v) return;
+  addPerson(v, people.length === 0); // az első név: „én”
+  $('pname').value = '';
+  toast(people.length === 1 ? 'Elmentve, ez lettél te.' : 'Hozzáadva a követett nevekhez.');
+});
+$('pchips').addEventListener('click', e => {
+  const b = e.target.closest('[data-rm]');
+  if (b) removePerson(b.dataset.rm);
+});
 
 /* ===== Cím (hash): #452&div=Strictly%20Novice&role=Leader&q=anna ===== */
 function parseHash() {
@@ -409,26 +614,37 @@ function showState(kind, title, text) {
     `<h3>${esc(title)}</h3><p id="stateText">${esc(text || '')}</p>` +
     (kind === 'err' ? '<p style="margin-top:18px"><button class="btn-primary" id="retry">Újrapróbálás</button></p>' : '') +
     `</div>`;
-  v.querySelector('[data-home]').onclick = goHome;
+  v.querySelector('[data-home]').onclick = () => goHome(true);
 }
 
-function goHome() {
-  loadToken++;
-  document.body.classList.remove('on-event');
+function goHome(animate) {
+  const run = () => {
+    loadToken++;
+    closeSheet(true);
+    document.body.classList.remove('on-event');
+    current = null;
+    $('eventView').classList.add('hidden');
+    $('stateView').classList.add('hidden');
+    $('welcome').classList.remove('hidden');
+    $('evTitle').style.viewTransitionName = '';
+    document.title = 'Nevezések';
+    markActive();
+    scrollTo(0, 0);
+  };
   if (location.hash) history.pushState(null, '', location.pathname + location.search);
-  current = null;
-  $('eventView').classList.add('hidden');
-  $('stateView').classList.add('hidden');
-  $('welcome').classList.remove('hidden');
-  document.title = 'Nevezések';
-  markActive();
-  scrollTo(0, 0);
+  animate ? withTransition(run, true) : run();
 }
 
-function openEvent(id) {
+function openEvent(id, srcEl) {
   clearFilters();
   if (parseHash().id !== id) history.pushState(null, '', '#' + id);
-  load(id, false);
+  const t = srcEl && srcEl.querySelector('.t');
+  if (t) t.style.viewTransitionName = 'evtitle';
+  withTransition(() => {
+    if (t) t.style.viewTransitionName = '';
+    $('evTitle').style.viewTransitionName = 'evtitle';
+    load(id, false);
+  });
 }
 
 /* ===== Betöltés ===== */
@@ -437,36 +653,54 @@ async function load(eventId, refresh) {
   document.body.classList.add('on-event');
   $('eventId').value = '';
   const known = knownEvents.find(e => e.eventId === eventId);
+  const local = refresh ? null : store.get(EV_KEY(eventId), null);
   const t0 = Date.now();
-  const title = known ? (known.eventName || 'Event ' + eventId) : 'Event ' + eventId;
+  const title = known ? (known.eventName || 'Event ' + eventId) : (local && local.eventName) || 'Event ' + eventId;
   let text = 'Betöltés…';
-  if (refresh) $('refresh').classList.add('spin');
+
+  // azonnali megjelenítés a telefonon mentett adatból, közben frissítés a szerverről
+  if (local) { current = local; divisions = buildDivisions(local.rows); render(); scrollTo(0, 0); }
+  else if (refresh) $('refresh').classList.add('spin');
   else { showState('load', title, text); scrollTo(0, 0); }
+
   const tick = setInterval(() => {
     const el = $('stateText');
     if (el && my === loadToken) el.textContent = `${text} (${Math.round((Date.now() - t0) / 1000)} mp)`;
   }, 1000);
   try {
-    if (!refresh && !known) {
+    if (!refresh && !known && !local) {
       try {
-        const info = await api({ event: eventId, action: 'info' });
+        const info = await api({ event: eventId, action: 'info' }, 30000);
         text = info.sheet ? 'Betöltés…' : 'Első lekérés a scoring.dance-ről. Ez 1–3 percig tart, utána mindenkinek azonnal betölt.';
         if (my === loadToken) showState('load', title, text);
       } catch (e) { /* nem kritikus */ }
     }
     const params = { event: eventId };
     if (refresh) params.refresh = '1';
-    const data = await api(params);
+    const data = await api(params, refresh ? 6 * 60000 : 6 * 60000);
     if (my !== loadToken) return;
+    if (!data.eventName && known && known.eventName) data.eventName = known.eventName;
+    saveEventLocal(data);
+    const changed = !current || current.eventId !== data.eventId || current.fetchedAt !== data.fetchedAt || refresh;
     current = data;
-    if (!current.eventName && known && known.eventName) current.eventName = known.eventName;
-    divisions = buildDivisions(current.rows);
-    render();
+    if (changed) {
+      const y = scrollY;
+      divisions = buildDivisions(current.rows);
+      render();
+      if (local || refresh) scrollTo(0, y);
+      if (refresh) toast('Adatok frissítve.');
+    } else renderMeta();
+    $('notice').classList.add('hidden');
     loadKnown();
   } catch (e) {
     if (my !== loadToken) return;
-    if (refresh && current) alert('A frissítés nem sikerült: ' + e.message);
-    else {
+    if (current && current.eventId === eventId) {
+      if (refresh) toast('A frissítés nem sikerült: ' + e.message);
+      else {
+        $('notice').textContent = 'Nincs kapcsolat a szerverrel: a telefonon mentett adatot látod (' + relTime(current.fetchedAt) + ').';
+        $('notice').classList.remove('hidden');
+      }
+    } else {
       showState('err', 'Nem sikerült betölteni', e.message);
       $('retry').onclick = () => load(eventId, false);
     }
@@ -482,14 +716,19 @@ const nm = t => `<span class="nm" data-t="${esc(t)}">${esc(t)}</span>`;
 const personRows = list => list.map(r =>
   `<li class="row" data-n="${esc(r.name.toLowerCase())}">${bib(r.bib)}<span class="who">${nm(r.name)}</span></li>`).join('');
 
-function render() {
+function renderMeta() {
   const name = current.eventName || 'Event ' + current.eventId;
-  const when = new Date(current.fetchedAt).toLocaleString('hu-HU', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const info = current.sheet || {};
   $('evTitle').textContent = name;
-  $('evMeta').textContent = `Frissítve: ${when}`;
+  $('evMeta').textContent = info.closed
+    ? `Lezárult esemény, utolsó adat: ${relTime(current.fetchedAt)}`
+    : `Élő, frissítve ${relTime(current.fetchedAt)}`;
   $('evMeta').title = 'event ID: ' + current.eventId;
   document.title = name;
+}
 
+function render() {
+  renderMeta();
   const L = divisions.reduce((s, d) => s + d.leaders.length, 0);
   const F = divisions.reduce((s, d) => s + d.followers.length, 0);
   $('stats').innerHTML =
@@ -499,7 +738,7 @@ function render() {
 
   if (filters.div && !divisions.some(d => d.name === filters.div)) filters.div = null;
   $('strip').innerHTML = `<button class="chip" data-k="" aria-pressed="${!filters.div}">Összes</button>` +
-    divisions.map((d, i) => `<button class="chip" data-k="${esc(d.name)}" data-i="${i}" aria-pressed="${filters.div === d.name}">${esc(d.name)} <span class="n num">${d.isCouple ? d.couples.length : d.leaders.length + d.followers.length}</span></button>`).join('');
+    divisions.map((d, i) => `<button class="chip" data-k="${esc(d.name)}" data-i="${i}" aria-pressed="${filters.div === d.name}">${esc(d.name)} <span class="n num">${d.isCouple ? d.couples.length : d.leaders.length + d.followers.length}</span><span class="favdots"></span></button>`).join('');
 
   $('overview').innerHTML = divisions.map((d, i) => {
     let bar;
@@ -526,7 +765,7 @@ function render() {
     }
     if (d.other.length) body += `<div class="lists" style="margin-top:14px"><div class="group"><h4><span>Szerep nélkül</span><span class="num">${d.other.length}</span></h4><ul class="rows">${personRows(d.other)}</ul></div></div>`;
     const meta = d.isCouple ? `${d.couples.length} pár` : `${d.leaders.length} leader, ${d.followers.length} follower`;
-    return `<section class="section" id="sec-${i}"><div class="sechead"><h3>${esc(d.name)}</h3><span class="meta num">${meta}</span></div>${body}</section>`;
+    return `<section class="section" id="sec-${i}" data-i="${i}"><div class="sechead"><h3>${esc(d.name)}</h3><span class="meta num">${meta}</span></div>${body}</section>`;
   }).join('');
 
   $('q').value = filters.q;
@@ -537,10 +776,76 @@ function render() {
   $('filters').classList.remove('tuck');
   setBarH();
   markActive();
+  decorateFavs();
+  renderMine();
   applyFilters();
   const act = filters.div && $('strip').querySelector('[aria-pressed="true"]');
   if (act) act.scrollIntoView({ inline: 'center', block: 'nearest' });
 }
+
+/* követett nevek jelölése a listákban és a chipeken */
+function decorateFavs() {
+  document.querySelectorAll('#sections .nm').forEach(el => {
+    const p = personFor(el.dataset.t);
+    el.classList.toggle('fav', !!p);
+    if (p) el.style.setProperty('--c', p.color); else el.style.removeProperty('--c');
+  });
+  document.querySelectorAll('#sections .row').forEach(r => {
+    const f = r.querySelector('.nm.fav');
+    r.classList.toggle('fav', !!f);
+    if (f) r.style.setProperty('--c', f.style.getPropertyValue('--c')); else r.style.removeProperty('--c');
+  });
+  divisions.forEach((d, i) => {
+    const colors = [...new Set([...$('sec-' + i).querySelectorAll('.nm.fav')].map(el => el.style.getPropertyValue('--c')))];
+    const dots = $('strip').querySelector(`.chip[data-i="${i}"] .favdots`);
+    if (dots) dots.innerHTML = colors.slice(0, 4).map(c => `<i style="--c:${c}"></i>`).join('');
+  });
+}
+
+/* „Itt indultok” kártyák az esemény tetején */
+function entriesOf(name) {
+  const k = norm(name);
+  const out = [];
+  divisions.forEach((d, i) => {
+    const rows = [...d.leaders, ...d.followers, ...d.other];
+    rows.forEach(r => { if (norm(r.name) === k) out.push({ i, div: d.name, role: r.role, partner: r.partner, bib: r.bib }); });
+    if (d.isCouple) d.couples.forEach(c => {
+      if (norm(c.follower) === k && !rows.some(r => norm(r.name) === k)) out.push({ i, div: d.name, role: 'Follower', partner: c.leader, bib: c.bib, viaPartner: true });
+      if (norm(c.leader) === k && !rows.some(r => norm(r.name) === k)) out.push({ i, div: d.name, role: 'Leader', partner: c.follower, bib: c.bib, viaPartner: true });
+    });
+  });
+  return out;
+}
+function renderMine() {
+  if (!current) return;
+  const found = new Map(); // valódi név -> person
+  document.querySelectorAll('#sections .nm.fav').forEach(el => {
+    const p = personFor(el.dataset.t);
+    if (p && !found.has(norm(el.dataset.t))) found.set(norm(el.dataset.t), { name: el.dataset.t, p });
+  });
+  // ha a név kisbetűvel / ékezet nélkül lett beírva, javítsuk a pontos alakra
+  let fixed = false;
+  found.forEach(({ name, p }) => { if (norm(p.name) === norm(name) && p.name !== name) { p.name = name; fixed = true; } });
+  if (fixed) { store.set('wcs-people-v1', people); renderPeople(); }
+  const cards = [...found.values()].sort((a, b) => (b.p.me ? 1 : 0) - (a.p.me ? 1 : 0)).map(({ name, p }) => {
+    const ents = entriesOf(name);
+    return `<div class="mcard" style="--c:${p.color}"><div class="who"><span class="dot" style="width:10px;height:10px;border-radius:50%;background:${p.color}"></span>${esc(name)}${p.me ? ' <em>te</em>' : ''}</div>` +
+      `<div class="ents">${ents.map(e => `<button class="ent" data-goto="${e.i}" data-name="${esc(name)}"><span class="r ${divisions[e.i].isCouple ? 'C' : e.role === 'Leader' ? 'L' : 'F'}"></span>${esc(e.div)}</button>`).join('')}</div></div>`;
+  });
+  $('mine').innerHTML = cards.join('');
+}
+$('mine').addEventListener('click', e => {
+  const b = e.target.closest('[data-goto]');
+  if (!b) return;
+  selectDiv(divisions[b.dataset.goto].name, false);
+  const k = norm(b.dataset.name);
+  const el = [...$('sec-' + b.dataset.goto).querySelectorAll('.nm')].find(x => norm(x.dataset.t) === k);
+  const row = el && el.closest('.row');
+  if (row) setTimeout(() => {
+    row.scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth', block: 'center' });
+    row.classList.remove('flash'); void row.offsetWidth; row.classList.add('flash');
+  }, 60);
+});
 
 /* ===== Szűrés + kiemelés ===== */
 function highlight(el, q) {
@@ -577,8 +882,10 @@ function applyFilters() {
     $('overview').querySelector(`.ovrow[data-i="${i}"]`).classList.toggle('has-hit', n > 0);
   });
 
-  $('overview').classList.toggle('hidden', !!filters.div);
-  $('stats').classList.toggle('hidden', !!filters.div);
+  const all = !filters.div;
+  $('overview').classList.toggle('hidden', !all);
+  $('stats').classList.toggle('hidden', !all);
+  $('mine').classList.toggle('hidden', !all);
   $('findinfo').textContent = !q ? '' : hits
     ? `${hits} találat ${hitDivs} divízióban. Enter: következő találat.`
     : 'Nincs ilyen név ebben az eseményben.';
@@ -593,12 +900,12 @@ function jumpToHit(step) {
   hitRows[hitPos].scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
-function selectDiv(name) {
+function selectDiv(name, toTop = true) {
   filters.div = name || null;
   $('strip').querySelectorAll('.chip').forEach(c =>
     c.setAttribute('aria-pressed', filters.div ? c.dataset.k === filters.div : !c.dataset.k));
   applyFilters();
-  scrollTo({ top: 0, behavior: 'smooth' });
+  if (toTop) scrollTo({ top: 0, behavior: 'smooth' });
   const act = $('strip').querySelector('[aria-pressed="true"]');
   if (filters.div && act) act.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
   else $('strip').scrollTo({ left: 0, behavior: 'smooth' });
@@ -606,6 +913,81 @@ function selectDiv(name) {
 function syncSeg() {
   $('seg').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.r === filters.role));
 }
+
+/* ===== Versenyző-adatlap ===== */
+const ICON_SHARE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M7 8l5-5 5 5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>';
+const ICON_EXT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M10 14L20 4"/><path d="M19 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h6"/></svg>';
+let sheetName = null;
+function openProfile(name, inPlace) {
+  sheetName = name;
+  const ents = entriesOf(name);
+  const own = ents.filter(e => !e.viaPartner);
+  const bibs = [...new Set(own.map(e => e.bib))];
+  const p = personFor(name);
+  const isFav = !!p;
+  const roleCls = e => e.role === 'Leader' ? 'L' : 'F';
+  $('sheet').innerHTML =
+    `<div class="grab"></div>` +
+    `<div class="phead">${bibs.length ? `<span class="bib big num">${esc(bibs[0])}</span>` : ''}<div><h3 id="pTitle">${esc(name)}</h3>` +
+    `<p>${ents.length ? ents.length + ' divízióban indul' : 'Nincs nevezése'}${bibs.length > 1 ? ', rajtszámok: ' + bibs.map(esc).join(', ') : ''}</p></div></div>` +
+    `<ul class="plist">${ents.map(e => `<li><div class="d"><b>${esc(e.div)}</b>${e.partner ? `<span>Partner: ${esc(e.partner)}</span>` : ''}${e.viaPartner ? '<span> (a partner nevezte)</span>' : ''}</div><span class="role ${roleCls(e)}">${esc(e.role || '–')}</span></li>`).join('')}</ul>` +
+    `<div class="pacts">` +
+      `<button class="${isFav ? '' : 'primary'}" data-act="fav">${isFav ? 'Követés vége' : 'Követés'}</button>` +
+      `<button data-act="me">${p && p.me ? 'Ez vagyok én ✓' : 'Ez vagyok én'}</button>` +
+      `<button data-act="share">${ICON_SHARE}Megosztás</button>` +
+      (bibs.length ? `<a href="${SCORING_URL}${encodeURIComponent(current.eventId)}/wall?q=${encodeURIComponent(bibs[0])}" target="_blank" rel="noopener">${ICON_EXT}scoring.dance</a>` : '<span></span>') +
+    `</div>`;
+  if (inPlace) return;
+  $('scrim').classList.remove('hidden'); $('sheet').classList.remove('hidden');
+  document.body.classList.add('sheet-open');
+  requestAnimationFrame(() => requestAnimationFrame(() => { $('scrim').classList.add('show'); $('sheet').classList.add('show'); }));
+  history.pushState({ sheet: true }, '', location.href);
+}
+function closeSheet(silent) {
+  if ($('sheet').classList.contains('hidden')) return;
+  $('scrim').classList.remove('show'); $('sheet').classList.remove('show');
+  document.body.classList.remove('sheet-open');
+  setTimeout(() => { $('scrim').classList.add('hidden'); $('sheet').classList.add('hidden'); }, reduceMotion() ? 0 : 280);
+  sheetName = null;
+  if (!silent && history.state && history.state.sheet) history.back();
+}
+$('scrim').addEventListener('click', () => closeSheet());
+addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
+$('sheet').addEventListener('click', e => {
+  const b = e.target.closest('[data-act]');
+  if (!b || !sheetName) return;
+  const name = sheetName, p = personFor(name);
+  if (b.dataset.act === 'fav') {
+    if (p) { removePerson(p.name); toast('Követés vége.'); } else { addPerson(name, false); toast('Követed: ' + name); }
+    openProfile(name, true);
+  } else if (b.dataset.act === 'me') {
+    addPerson(p ? p.name : name, true); toast('Elmentve, ez vagy te.');
+    openProfile(name, true);
+  } else if (b.dataset.act === 'share') {
+    const url = location.href.split('#')[0] + '#' + current.eventId + '&q=' + encodeURIComponent(name);
+    shareLink(`${name} – ${current.eventName || 'Event ' + current.eventId}`, url);
+  }
+});
+$('sections').addEventListener('click', e => {
+  const row = e.target.closest('.row');
+  if (!row) return;
+  const el = e.target.closest('.nm') || row.querySelector('.nm');
+  if (el) openProfile(el.dataset.t);
+});
+
+/* ===== Megosztás ===== */
+async function shareLink(title, url) {
+  if (navigator.share) {
+    try { await navigator.share({ title, url }); return; } catch (e) { if (e.name === 'AbortError') return; }
+  }
+  try { await navigator.clipboard.writeText(url); toast('Link a vágólapon.'); }
+  catch (e) { prompt('Másold ki a linket:', url); }
+}
+$('share').addEventListener('click', () => {
+  if (!current) return;
+  const d = filters.div ? ' – ' + filters.div : '';
+  shareLink((current.eventName || 'Event ' + current.eventId) + d, location.href);
+});
 
 /* ===== Interakciók ===== */
 $('strip').addEventListener('click', e => {
@@ -635,10 +1017,13 @@ $('q').addEventListener('keydown', e => {
   if (filters.q !== e.target.value) { filters.q = e.target.value; applyFilters(); }
   jumpToHit(e.shiftKey ? -1 : 1);
 });
-$('back').addEventListener('click', goHome);
+$('back').addEventListener('click', () => goHome(true));
 $('refresh').addEventListener('click', () => {
   if (!current || $('refresh').classList.contains('spin')) return;
-  if (confirm('Friss adatok lekérése a scoring.dance-ről? Ez 1–3 percig tart.')) load(current.eventId, true);
+  if (confirm('Friss adatok lekérése a scoring.dance-ről most? Ez 1–3 percig tart. (Az esemény magától is frissül.)')) {
+    $('refresh').classList.add('spin');
+    load(current.eventId, true);
+  }
 });
 $('idform').addEventListener('submit', e => {
   e.preventDefault();
@@ -647,7 +1032,6 @@ $('idform').addEventListener('submit', e => {
   openEvent(id);
 });
 
-/* görgetéskor a szűrősáv behúzódik, felfelé görgetve visszajön */
 function setBarH() {
   document.documentElement.style.setProperty('--barh', $('appbar').getBoundingClientRect().height + 'px');
 }
@@ -662,45 +1046,48 @@ addEventListener('scroll', () => {
 }, { passive: true });
 
 addEventListener('popstate', () => {
+  if (!$('sheet').classList.contains('hidden')) { closeSheet(true); return; }
   const h = parseHash();
-  if (!h.id) { if (current || document.body.classList.contains('on-event')) goHome(); return; }
+  if (!h.id) { if (current || document.body.classList.contains('on-event')) goHome(true); return; }
   if (!current || current.eventId !== h.id) { clearFilters(); load(h.id, false); }
 });
 
-/* ===== Eseménylista ===== */
+/* ===== Eseménylista: aktív és lezárult csoport ===== */
 const LIST_KEY = 'wcs-evlist-v1';
 function renderKnown(list) {
   const label = ev => ev.eventName || 'Event ' + ev.eventId;
   knownEvents = (list || []).filter(ev => ev && ev.eventId)
     .sort((a, b) => label(a).localeCompare(label(b), 'hu', { sensitivity: 'base', numeric: true }));
+  const item = ev =>
+    `<button class="ev${ev.closed ? ' closed' : ''}" data-ev="${esc(ev.eventId)}" data-s="${esc(norm(label(ev) + ' ' + ev.eventId))}">` +
+    `<span class="t">${esc(label(ev))}</span>` +
+    `<span class="s num">${ev.closed ? '' : `<span class="live">élő</span>`}${ev.count ? esc(ev.count) + ' versenyző, ' : ''}` +
+    `${ev.closed ? 'lezárult' : 'frissítve ' + esc(relTime(ev.dataFetchedAt || ev.updatedAt))}</span>` +
+    `<span class="go" aria-hidden="true">›</span></button>`;
+  const active = knownEvents.filter(e => !e.closed), closed = knownEvents.filter(e => e.closed);
   $('evCount').textContent = knownEvents.length || '';
   $('evFilter').classList.toggle('hidden', knownEvents.length < 8);
-  $('evList').innerHTML = knownEvents.map(ev =>
-    `<button class="ev" data-ev="${esc(ev.eventId)}" data-s="${esc((label(ev) + ' ' + ev.eventId).toLowerCase())}">` +
-    `<span class="t">${esc(label(ev))}</span>` +
-    `<span class="s num">${ev.count ? esc(ev.count) + ' versenyző, ' : ''}#${esc(ev.eventId)}</span>` +
-    `<span class="go" aria-hidden="true">›</span></button>`).join('');
+  $('evList').innerHTML =
+    (active.length ? (closed.length ? '<h3 class="subhead">Aktív</h3>' : '') + `<div class="evlist">${active.map(item).join('')}</div>` : '') +
+    (closed.length ? '<h3 class="subhead">Lezárult</h3>' + `<div class="evlist">${closed.map(item).join('')}</div>` : '');
   markActive();
   filterEvents();
   if (current && !current.eventName) {
     const k = knownEvents.find(e => e.eventId === current.eventId);
-    if (k && k.eventName) { current.eventName = k.eventName; $('evTitle').textContent = k.eventName; document.title = k.eventName; }
+    if (k && k.eventName) { current.eventName = k.eventName; renderMeta(); }
   }
 }
 
 async function loadKnown() {
-  // 1) azonnal: az előző látogatásból mentett lista (ha van)
-  let cached = null;
-  try { cached = JSON.parse(localStorage.getItem(LIST_KEY) || 'null'); } catch (e) {}
+  const cached = store.get(LIST_KEY, null);
   if (cached && !knownEvents.length) renderKnown(cached);
   $('evLoading').classList.toggle('hidden', knownEvents.length > 0);
   $('evEmpty').classList.add('hidden');
-  // 2) frissen a szerverről
   try {
     const data = await api({ action: 'list' }, 45000);
     renderKnown(data.events);
-    try { localStorage.setItem(LIST_KEY, JSON.stringify(data.events || [])); } catch (e) {}
-    $('evEmpty').innerHTML = 'Még nincs lekért esemény. Írd be egy scoring.dance esemény ID-ját: a címben az /events/ utáni szám.';
+    store.set(LIST_KEY, data.events || []);
+    $('evEmpty').textContent = 'Még nincs lekért esemény. Írd be egy scoring.dance esemény ID-ját: a címben az /events/ utáni szám.';
     $('evEmpty').classList.toggle('hidden', knownEvents.length > 0);
   } catch (e) {
     if (!knownEvents.length) {
@@ -716,16 +1103,22 @@ function markActive() {
   document.querySelectorAll('#evList .ev').forEach(b => b.classList.toggle('active', !!current && b.dataset.ev === current.eventId));
 }
 function filterEvents() {
-  const q = $('evFilter').value.trim().toLowerCase();
+  const q = norm($('evFilter').value);
   document.querySelectorAll('#evList .ev').forEach(b => b.classList.toggle('hidden', !!q && !b.dataset.s.includes(q)));
 }
 $('evFilter').addEventListener('input', filterEvents);
 $('evList').addEventListener('click', e => {
   const b = e.target.closest('.ev');
-  if (b) openEvent(b.dataset.ev);
+  if (b) openEvent(b.dataset.ev, b);
 });
 
+/* ===== Telepíthető app (service worker) ===== */
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+
 /* ===== Indulás ===== */
+renderPeople();
 loadKnown();
 const start = parseHash();
 if (start.id) {
