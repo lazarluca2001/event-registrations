@@ -99,6 +99,16 @@
   .cols.single { grid-template-columns: 1fr; }
   @media (max-width: 640px) { .cols { grid-template-columns: 1fr; } }
   mark { background: #ffe58a; color: inherit; border-radius: 2px; }
+  :root { --hit: #fff1b8; --hit-line: #e0a800; }
+  @media (prefers-color-scheme: dark) { :root { --hit: #3d3410; --hit-line: #d9a400; } }
+  tr.hit td { background: var(--hit); }
+  tr.hit td:first-child { box-shadow: inset 3px 0 0 var(--hit-line); }
+  tr.hit.cur td { outline: 2px solid var(--hit-line); outline-offset: -2px; }
+  .card.has-hit { border-color: var(--hit-line); box-shadow: 0 0 0 1px var(--hit-line); }
+  .summary tr.has-hit td { background: var(--hit); }
+  .chip.has-hit { border-color: var(--hit-line); box-shadow: 0 0 0 1px var(--hit-line); }
+  .chip.has-hit::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--hit-line); }
+  .chip[aria-pressed="true"].has-hit::before { background: var(--accent-ink); }
   @media (prefers-color-scheme: dark) { mark { background: #6b5a12; } }
 </style>
 </head>
@@ -132,11 +142,10 @@
     </div>
 
     <div class="filters">
-      <div class="frow"><span class="lbl">Típus</span><div class="chips" id="fType"></div></div>
-      <div class="frow"><span class="lbl">Szint</span><div class="chips" id="fLevel"></div></div>
+      <div class="frow"><span class="lbl">Divízió</span><div class="chips" id="fDiv"></div></div>
       <div class="frow"><span class="lbl">Szerep</span><div class="chips" id="fRole"></div></div>
       <div class="fbottom">
-        <input type="text" id="search" placeholder="Keresés névre…">
+        <input type="text" id="search" placeholder="Név kiemelése…" title="Enter: ugrás a következő találatra">
         <button class="chip ghost" id="reset" type="button">Szűrők törlése</button>
         <span id="filterInfo" class="tag"></span>
       </div>
@@ -147,7 +156,7 @@
       <table class="summary">
         <thead><tr><th>Divízió</th><th class="num">Leader</th><th class="num">Follower</th><th class="num">Pár</th></tr></thead>
         <tbody id="sumBody"></tbody>
-        <tfoot><tr><td>Összesen (szűrt)</td><td class="num" id="sumL"></td><td class="num" id="sumF"></td><td class="num" id="sumC"></td></tr></tfoot>
+        <tfoot><tr><td>Összesen</td><td class="num" id="sumL"></td><td class="num" id="sumF"></td><td class="num" id="sumC"></td></tr></tfoot>
       </table>
     </div>
     <div id="divs"></div>
@@ -225,7 +234,8 @@ function buildDivisions(rows) {
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 let current = null, divisions = [];
-const filters = { type: new Set(), level: new Set(), role: new Set(), q: '' };
+const filters = { div: null, role: new Set(), q: '' };
+function clearFilters() { filters.div = null; filters.role.clear(); filters.q = ''; }
 
 function setStatus(msg, isErr) { $('status').textContent = msg; $('status').className = isErr ? 'err' : ''; }
 
@@ -237,18 +247,20 @@ async function api(params) {
   return data;
 }
 
-/* ===== URL hash: #452&type=strictly&level=novice,advanced&role=Leader&q=anna ===== */
+/* ===== URL hash: #452&div=Strictly%20Novice&role=Leader&q=anna ===== */
 function readHash() {
   const [id, ...rest] = location.hash.replace(/^#/, '').split('&');
   const p = new URLSearchParams(rest.join('&'));
-  ['type', 'level', 'role'].forEach(k => { filters[k] = new Set((p.get(k) || '').split(',').filter(Boolean)); });
+  filters.div = p.get('div') || null;
+  filters.role = new Set((p.get('role') || '').split(',').filter(Boolean));
   filters.q = p.get('q') || '';
   return id;
 }
 function writeHash() {
   if (!current) return;
   const p = new URLSearchParams();
-  ['type', 'level', 'role'].forEach(k => { if (filters[k].size) p.set(k, [...filters[k]].join(',')); });
+  if (filters.div) p.set('div', filters.div);
+  if (filters.role.size) p.set('role', [...filters.role].join(','));
   if (filters.q) p.set('q', filters.q);
   const s = p.toString();
   history.replaceState(null, '', '#' + current.eventId + (s ? '&' + s : ''));
@@ -294,18 +306,16 @@ async function load(eventId, refresh) {
 }
 
 /* ===== Megjelenítés ===== */
-function chip(group, key, label, count) {
-  const on = filters[group].has(key);
-  return `<button type="button" class="chip" data-g="${group}" data-k="${esc(key)}" aria-pressed="${on}">${esc(label)}${count != null ? ` <span class="n">${count}</span>` : ''}</button>`;
+function chip(group, key, label, count, on) {
+  return `<button type="button" class="chip" data-g="${group}" data-k="${esc(key)}" aria-pressed="${!!on}">${esc(label)}${count != null ? ` <span class="n">${count}</span>` : ''}</button>`;
 }
 
 function renderChips() {
-  const countBy = (fn) => divisions.reduce((m, d) => (m[fn(d)] = (m[fn(d)] || 0) + 1, m), {});
-  const tc = countBy(d => d.type), lc = countBy(d => d.level.key);
-  $('fType').innerHTML = TYPE_DEFS.filter(([k]) => tc[k]).map(([k, l]) => chip('type', k, l, tc[k])).join('');
-  const levels = LEVEL_DEFS.map(d => [d[0], d[1]]).concat([['other', 'Egyéb']]);
-  $('fLevel').innerHTML = levels.filter(([k]) => lc[k]).map(([k, l]) => chip('level', k, l, lc[k])).join('');
-  $('fRole').innerHTML = ROLE_DEFS.map(([k, l]) => chip('role', k, l)).join('');
+  if (filters.div && !divisions.some(d => d.name === filters.div)) filters.div = null;
+  $('fDiv').innerHTML = chip('div', '', 'Összes', null, !filters.div) +
+    divisions.map(d => chip('div', d.name, d.name,
+      d.isCouple ? d.couples.length : d.leaders.length + d.followers.length, filters.div === d.name)).join('');
+  $('fRole').innerHTML = ROLE_DEFS.map(([k, l]) => chip('role', k, l, null, filters.role.has(k))).join('');
 }
 
 function personTable(title, list, role) {
@@ -316,6 +326,10 @@ function personTable(title, list, role) {
 
 function render() {
   const when = new Date(current.fetchedAt).toLocaleString('hu-HU', { dateStyle: 'medium', timeStyle: 'short' });
+  if (!current.eventName) { // régi cache-elt adat: név az oldalsávból
+    const sb = document.querySelector(`#knownList .evitem[data-ev="${current.eventId}"]`);
+    if (sb && !/^Event \d+$/.test(sb.firstChild.textContent)) current.eventName = sb.firstChild.textContent;
+  }
   $('evName').textContent = current.eventName || ('Event ' + current.eventId);
   document.title = (current.eventName || 'Event ' + current.eventId) + ' – nevezések';
   $('meta').textContent = `Utolsó frissítés: ${when} · event ID: ${current.eventId}`;
@@ -345,11 +359,9 @@ function render() {
   applyFilters();
 }
 
-/* ===== Szűrés ===== */
+/* ===== Szűrés + kiemelés ===== */
 function divisionVisible(d) {
-  if (filters.type.size && !filters.type.has(d.type)) return false;
-  if (filters.level.size && !filters.level.has(d.level.key)) return false;
-  return true;
+  return !filters.div || d.name === filters.div;
 }
 
 function highlight(cell, q) {
@@ -359,14 +371,16 @@ function highlight(cell, q) {
   cell.innerHTML = i < 0 ? esc(t) : esc(t.slice(0, i)) + '<mark>' + esc(t.slice(i, i + q.length)) + '</mark>' + esc(t.slice(i + q.length));
 }
 
+let hitRows = [], hitPos = -1;
+
 function applyFilters() {
   const q = filters.q.trim().toLowerCase();
   const roleOnly = filters.role.size === 1 ? [...filters.role][0] : null;
-  let sL = 0, sF = 0, sC = 0, shownDivs = 0, hits = 0;
+  let sL = 0, sF = 0, sC = 0, hits = 0, hitDivs = 0;
+  hitRows = []; hitPos = -1;
 
   divisions.forEach((d, i) => {
-    let vis = divisionVisible(d);
-    // páros divízió csak egy szerepre szűrve is látszik (ott nincs külön oszlop)
+    const vis = divisionVisible(d);
     const card = $('div-' + i);
 
     // szerep: oszlopok elrejtése
@@ -376,44 +390,65 @@ function applyFilters() {
     const cols = card.querySelector('.cols');
     if (cols) cols.classList.toggle('single', !!roleOnly);
 
-    // név keresés
+    // név: csak kiemelés, nem szűr
     let divHits = 0;
     card.querySelectorAll('tr[data-n]').forEach(tr => {
-      const m = !q || tr.dataset.n.includes(q);
-      tr.classList.toggle('hidden', !m);
-      if (m && q && !tr.closest('[data-role].hidden')) divHits++;
+      const m = !!q && tr.dataset.n.includes(q) && !tr.closest('[data-role].hidden');
+      tr.classList.toggle('hit', m);
+      tr.classList.remove('cur');
+      if (m) { divHits++; if (vis) hitRows.push(tr); }
     });
     card.querySelectorAll('.nm').forEach(c => highlight(c, q));
-    if (q && divHits === 0) vis = false;
-    if (vis) hits += divHits;
 
     card.classList.toggle('hidden', !vis);
-    $('sumBody').querySelector(`tr[data-i="${i}"]`).classList.toggle('hidden', !divisionVisible(d));
-    if (divisionVisible(d)) {
-      sL += d.leaders.length; sF += d.followers.length; sC += d.isCouple ? d.couples.length : 0;
-    }
-    if (vis) shownDivs++;
+    card.classList.toggle('has-hit', divHits > 0);
+    const sr = $('sumBody').querySelector(`tr[data-i="${i}"]`);
+    sr.classList.toggle('hidden', !vis);
+    sr.classList.toggle('has-hit', divHits > 0);
+    const ch = $('fDiv').querySelector(`.chip[data-k="${CSS.escape(d.name)}"]`);
+    if (ch) { ch.classList.toggle('has-hit', divHits > 0); ch.title = divHits ? `${divHits} találat` : ''; }
+
+    if (vis) { sL += d.leaders.length; sF += d.followers.length; sC += d.isCouple ? d.couples.length : 0; }
+    if (divHits) { hits += divHits; hitDivs++; }
   });
 
   $('sumL').textContent = sL; $('sumF').textContent = sF; $('sumC').textContent = sC || '';
-  const active = filters.type.size + filters.level.size + filters.role.size + (q ? 1 : 0);
+  const active = (filters.div ? 1 : 0) + filters.role.size + (q ? 1 : 0);
   $('reset').classList.toggle('hidden', !active);
-  $('filterInfo').textContent = `${shownDivs} / ${divisions.length} divízió` + (q ? ` · ${hits} találat` : '');
+  const shown = divisions.filter(divisionVisible).length;
+  $('filterInfo').textContent = (q ? (hits ? `„${filters.q.trim()}”: ${hits} találat ${hitDivs} divízióban · ` : `„${filters.q.trim()}”: nincs találat · `) : '') +
+    `${shown} / ${divisions.length} divízió`;
   writeHash();
 }
 
-/* chip kattintás: csoporton belül VAGY, csoportok között ÉS */
+/* Enter a névmezőben: ugrás a következő kiemelt sorra */
+function jumpToHit(step) {
+  if (!hitRows.length) return;
+  if (hitPos >= 0) hitRows[hitPos].classList.remove('cur');
+  hitPos = (hitPos + step + hitRows.length) % hitRows.length;
+  const tr = hitRows[hitPos];
+  tr.classList.add('cur');
+  tr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+/* chipek: divízió = egyszerre egy, szerep = kapcsoló */
 document.querySelector('.filters').addEventListener('click', e => {
   const b = e.target.closest('.chip[data-g]');
   if (!b) return;
-  const set = filters[b.dataset.g], k = b.dataset.k;
-  set.has(k) ? set.delete(k) : set.add(k);
-  b.setAttribute('aria-pressed', set.has(k));
+  const g = b.dataset.g, k = b.dataset.k;
+  if (g === 'div') {
+    filters.div = (!k || filters.div === k) ? null : k;
+    $('fDiv').querySelectorAll('.chip').forEach(c =>
+      c.setAttribute('aria-pressed', filters.div ? c.dataset.k === filters.div : !c.dataset.k));
+  } else {
+    filters.role.has(k) ? filters.role.delete(k) : filters.role.add(k);
+    b.setAttribute('aria-pressed', filters.role.has(k));
+  }
   applyFilters();
 });
 
 $('reset').addEventListener('click', () => {
-  filters.type.clear(); filters.level.clear(); filters.role.clear(); filters.q = '';
+  clearFilters();
   $('search').value = '';
   renderChips();
   applyFilters();
@@ -423,6 +458,9 @@ let searchT;
 $('search').addEventListener('input', e => {
   clearTimeout(searchT);
   searchT = setTimeout(() => { filters.q = e.target.value; applyFilters(); }, 120);
+});
+$('search').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); clearTimeout(searchT); filters.q = e.target.value; if (!hitRows.length) applyFilters(); jumpToHit(e.shiftKey ? -1 : 1); }
 });
 
 $('sumBody').addEventListener('click', e => {
@@ -434,7 +472,7 @@ $('f').addEventListener('submit', e => {
   e.preventDefault();
   const id = $('eventId').value.trim();
   if (!/^\d+$/.test(id)) return setStatus('Az event ID csak szám lehet.', true);
-  if (!current || current.eventId !== id) { filters.type.clear(); filters.level.clear(); filters.role.clear(); filters.q = ''; }
+  if (!current || current.eventId !== id) clearFilters();
   load(id, false);
 });
 
@@ -477,7 +515,7 @@ $('knownList').addEventListener('click', e => {
   if (!b) return;
   if (matchMedia('(max-width: 860px)').matches) $('sideDet').open = false;
   $('eventId').value = b.dataset.ev;
-  filters.type.clear(); filters.level.clear(); filters.role.clear(); filters.q = '';
+  clearFilters();
   load(b.dataset.ev, false);
 });
 
