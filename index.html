@@ -4,7 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>WCS nevezési lista</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root {
     --bg: #f6f7f4; --card: #ffffff; --ink: #1d2320; --muted: #66706a;
@@ -17,7 +16,32 @@
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--ink);
          font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  .wrap { max-width: 1200px; margin: 0 auto; padding: 24px 16px 64px; }
+  .layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); max-width: 1480px; margin: 0 auto; }
+  .layout.noside { grid-template-columns: minmax(0, 1fr); max-width: 1200px; }
+  .wrap { padding: 24px 16px 64px; min-width: 0; }
+
+  /* oldalsáv */
+  .side { position: sticky; top: 0; align-self: start; max-height: 100vh; overflow-y: auto;
+          padding: 24px 8px 24px 16px; border-right: 1px solid var(--line); }
+  .side details > summary { list-style: none; cursor: default; font-size: 12px; color: var(--muted);
+          text-transform: uppercase; letter-spacing: .04em; margin: 4px 8px 10px; }
+  .side details > summary::-webkit-details-marker { display: none; }
+  .side .sfilter { width: calc(100% - 8px); margin: 0 0 8px; padding: 7px 10px; font-size: 13px; }
+  .evlist { display: flex; flex-direction: column; gap: 2px; }
+  .evitem { display: block; width: 100%; text-align: left; padding: 8px 10px; border: none; border-radius: 8px;
+            background: transparent; color: var(--ink); font-size: 14px; line-height: 1.3; }
+  .evitem:hover { background: var(--accent-soft); }
+  .evitem.active { background: var(--accent); color: var(--accent-ink); }
+  .evitem .n { display: block; font-size: 12px; opacity: .7; margin-top: 2px; }
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: minmax(0, 1fr); }
+    .side { position: static; max-height: none; border-right: none; border-bottom: 1px solid var(--line);
+            padding: 12px 16px; }
+    .side details > summary { cursor: pointer; margin: 0; font-size: 14px; text-transform: none;
+            letter-spacing: 0; color: var(--ink); font-weight: 600; }
+    .side details > summary::after { content: ' ▾'; color: var(--muted); }
+    .side details[open] > summary { margin-bottom: 10px; }
+  }
   h1 { font-size: 22px; margin: 0 0 4px; }
   .sub { color: var(--muted); margin: 0 0 20px; }
   .hidden { display: none !important; }
@@ -44,7 +68,6 @@
   .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
   .chip .n { font-size: 11px; opacity: .7; font-variant-numeric: tabular-nums; }
   .chip.ghost { border-style: dashed; color: var(--muted); }
-  .known { margin-top: 14px; }
 
   /* szűrősáv */
   .filters { position: sticky; top: 0; z-index: 5; background: var(--bg);
@@ -56,9 +79,9 @@
   .fbottom input { width: 220px; }
   #filterInfo { margin-left: auto; }
 
-  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 16px; align-items: center; }
-  .sheetbox { background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 10px;
-              padding: 10px 14px; margin-bottom: 16px; }
+  .evhead { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; justify-content: space-between;
+            margin: 8px 0 4px; }
+  .evhead h2 { font-size: 20px; margin: 0 0 2px; }
 
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
           padding: 16px; margin-bottom: 16px; }
@@ -80,30 +103,32 @@
 </style>
 </head>
 <body>
-<div class="wrap">
+<div class="layout noside" id="layout">
+<aside class="side hidden" id="known">
+  <details id="sideDet" open>
+    <summary>Lekért események <span id="knownCount" class="tag"></span></summary>
+    <input type="text" class="sfilter" id="sideFilter" placeholder="Szűrés…">
+    <nav id="knownList" class="evlist"></nav>
+  </details>
+</aside>
+<main class="wrap">
   <h1>WCS nevezési lista</h1>
   <p class="sub">Írd be a scoring.dance esemény ID-ját (pl. a <code>scoring.dance/…/events/<b>438</b>/…</code> címből).</p>
 
   <form id="f">
     <input type="text" id="eventId" placeholder="Event ID" inputmode="numeric" required>
     <button class="primary" type="submit" id="go">Lekérés</button>
-    <label class="chk"><input type="checkbox" id="refresh"> friss adat (cache nélkül)</label>
   </form>
 
-  <div id="known" class="known chips hidden">
-    <span class="tag">Már elkészült táblázatok:</span>
-    <span id="knownList" class="chips"></span>
-  </div>
-
   <div id="status"></div>
-  <div id="sheetBox" class="sheetbox hidden"></div>
 
   <div id="result" class="hidden">
-    <div class="toolbar">
-      <button id="xlsx">Letöltés .xlsx</button>
-      <button id="sheet">Google Sheet létrehozása</button>
-      <button id="copyLink">Link másolása</button>
-      <span id="meta" class="tag"></span>
+    <div class="evhead">
+      <div>
+        <h2 id="evName"></h2>
+        <div class="tag" id="meta"></div>
+      </div>
+      <button id="refreshBtn" type="button">↻ Adatok frissítése</button>
     </div>
 
     <div class="filters">
@@ -233,17 +258,33 @@ function writeHash() {
 async function load(eventId, refresh) {
   $('go').disabled = true;
   $('result').classList.add('hidden');
-  $('sheetBox').classList.add('hidden');
   const t0 = Date.now();
-  const timer = setInterval(() => setStatus(`Lekérés folyamatban… ${Math.round((Date.now() - t0) / 1000)} mp (első lekérésnél 1–3 perc is lehet)`), 1000);
+  let msg = 'Betöltés…';
+  setStatus(msg);
+  const timer = setInterval(() => setStatus(`${msg} ${Math.round((Date.now() - t0) / 1000)} mp`), 1000);
   try {
+    // 1) gyors ellenőrzés: van-e már táblázat?
+    if (refresh) {
+      msg = 'Adatok frissítése a scoring.dance-ről (1–3 perc)…';
+    } else {
+      try {
+        const info = await api({ event: eventId, action: 'info' });
+        if (info.sheet) {
+          msg = 'Már lekért esemény, betöltés…';
+        } else {
+          msg = 'Első lekérés a scoring.dance-ről, ez 1–3 percig tart…';
+        }
+      } catch (e) { /* ha nem sikerül, simán megyünk tovább */ }
+    }
+    setStatus(msg);
+    // 2) adatok (táblázatból, vagy lekérés + táblázat létrehozása)
     const params = { event: eventId };
     if (refresh) params.refresh = '1';
     current = await api(params);
     divisions = buildDivisions(current.rows);
     render();
-    renderSheet(current.sheet);
     setStatus('');
+    loadKnown();
   } catch (e) {
     setStatus('Hiba: ' + e.message, true);
   } finally {
@@ -274,8 +315,10 @@ function personTable(title, list, role) {
 }
 
 function render() {
-  const when = new Date(current.fetchedAt).toLocaleString('hu-HU');
-  $('meta').textContent = `Event ${current.eventId} · lekérve: ${when}`;
+  const when = new Date(current.fetchedAt).toLocaleString('hu-HU', { dateStyle: 'medium', timeStyle: 'short' });
+  $('evName').textContent = current.eventName || ('Event ' + current.eventId);
+  document.title = (current.eventName || 'Event ' + current.eventId) + ' – nevezések';
+  $('meta').textContent = `Utolsó frissítés: ${when} · event ID: ${current.eventId}`;
   $('totals').textContent = `${current.count} versenyző · ${current.rows.length} nevezés`;
 
   $('sumBody').innerHTML = divisions.map((d, i) =>
@@ -296,6 +339,7 @@ function render() {
   }).join('');
 
   renderChips();
+  markActive();
   $('search').value = filters.q;
   $('result').classList.remove('hidden');
   applyFilters();
@@ -391,99 +435,58 @@ $('f').addEventListener('submit', e => {
   const id = $('eventId').value.trim();
   if (!/^\d+$/.test(id)) return setStatus('Az event ID csak szám lehet.', true);
   if (!current || current.eventId !== id) { filters.type.clear(); filters.level.clear(); filters.role.clear(); filters.q = ''; }
-  load(id, $('refresh').checked);
+  load(id, false);
 });
-
-/* ===== Excel export (a szűrt divíziókat menti) ===== */
-function sheetName(name, used) {
-  let n = name.replace(/[\[\]:*?\/\\]/g, ' ').slice(0, 31).trim() || 'lap';
-  while (used.has(n)) n = n.slice(0, 30) + '_';
-  used.add(n); return n;
-}
-$('xlsx').addEventListener('click', () => {
-  const vis = divisions.filter(divisionVisible);
-  const roleOnly = filters.role.size === 1 ? [...filters.role][0] : null;
-  const wb = XLSX.utils.book_new(), used = new Set();
-  const add = (aoa, name) => XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), sheetName(name, used));
-  const visNames = new Set(vis.map(d => d.name));
-  add([['Rajtszám', 'Név', 'Divízió', 'Szerep', 'Partner'],
-       ...current.rows.filter(r => visNames.has((r.competition || '').trim()) && (!roleOnly || r.role === roleOnly))
-         .map(r => [r.bib, r.name, r.competition, r.role, r.partner])], 'bib');
-  add([['Divízió', 'Leader', 'Follower', 'Pár'], ...vis.map(d => [d.name, d.leaders.length, d.followers.length, d.isCouple ? d.couples.length : ''])], 'összesítés');
-  vis.forEach(d => {
-    if (d.isCouple) {
-      add([['#', 'Leader', 'Follower'], ...d.couples.map(c => [c.bib, c.leader, c.follower])], d.name);
-    } else if (roleOnly) {
-      const list = roleOnly === 'Leader' ? d.leaders : d.followers;
-      add([['#', roleOnly], ...list.map(r => [r.bib, r.name])], d.name);
-    } else {
-      const n = Math.max(d.leaders.length, d.followers.length), aoa = [['#', 'Leader', '', '#', 'Follower']];
-      for (let i = 0; i < n; i++) {
-        const l = d.leaders[i], f = d.followers[i];
-        aoa.push([l ? l.bib : '', l ? l.name : '', '', f ? f.bib : '', f ? f.name : '']);
-      }
-      add(aoa, d.name);
-    }
-  });
-  const suffix = vis.length < divisions.length || roleOnly ? '_szurt' : '';
-  XLSX.writeFile(wb, `event_${current.eventId}${suffix}.xlsx`);
-});
-
-/* ===== Közös Google Sheet ===== */
-function renderSheet(sheet) {
-  const box = $('sheetBox');
-  if (sheet && sheet.url) {
-    const when = new Date(sheet.updatedAt).toLocaleString('hu-HU');
-    box.innerHTML = `📄 Ehhez az eseményhez már van közös táblázat: <a href="${esc(sheet.url)}" target="_blank" rel="noopener"><b>Google Sheet megnyitása</b></a> <span class="tag">· utoljára frissítve: ${esc(when)}</span>`;
-    box.classList.remove('hidden');
-    $('sheet').textContent = 'Google Sheet frissítése';
-  } else {
-    box.classList.add('hidden');
-    $('sheet').textContent = 'Google Sheet létrehozása';
-  }
-}
 
 async function loadKnown() {
   try {
     const data = await api({ action: 'list' });
-    const evs = (data.events || []).filter(ev => ev && ev.eventId);
-    if (!evs.length) return $('known').classList.add('hidden');
+    const label = ev => ev.eventName || 'Event ' + ev.eventId;
+    const evs = (data.events || []).filter(ev => ev && ev.eventId)
+      .sort((a, b) => label(a).localeCompare(label(b), 'hu', { sensitivity: 'base', numeric: true }));
+    const show = evs.length > 0;
+    $('known').classList.toggle('hidden', !show);
+    $('layout').classList.toggle('noside', !show);
+    if (!show) return;
+    $('knownCount').textContent = '(' + evs.length + ')';
+    $('sideFilter').classList.toggle('hidden', evs.length < 8);
     $('knownList').innerHTML = evs.map(ev =>
-      `<button type="button" class="chip" data-ev="${esc(ev.eventId)}">${esc(ev.eventId)}${ev.count ? ` <span class="n">${esc(ev.count)} fő</span>` : ''}</button>`).join('');
-    $('known').classList.remove('hidden');
+      `<button type="button" class="evitem" data-ev="${esc(ev.eventId)}" data-s="${esc(label(ev).toLowerCase())}" title="event ID: ${esc(ev.eventId)}">${esc(label(ev))}<span class="n">${ev.count ? esc(ev.count) + ' versenyző · ' : ''}#${esc(ev.eventId)}</span></button>`).join('');
+    markActive();
+    applySideFilter();
   } catch (e) { /* nem kritikus */ }
 }
+function markActive() {
+  document.querySelectorAll('#knownList .evitem').forEach(b =>
+    b.classList.toggle('active', !!current && b.dataset.ev === current.eventId));
+}
+function applySideFilter() {
+  const q = $('sideFilter').value.trim().toLowerCase();
+  document.querySelectorAll('#knownList .evitem').forEach(b =>
+    b.classList.toggle('hidden', !!q && !b.dataset.s.includes(q) && !b.dataset.ev.includes(q)));
+}
+$('sideFilter').addEventListener('input', applySideFilter);
+$('sideDet').querySelector('summary').addEventListener('click', e => {
+  if (!matchMedia('(max-width: 860px)').matches) e.preventDefault();
+});
+// mobilon becsukva indul az oldalsáv
+if (matchMedia('(max-width: 860px)').matches) $('sideDet').open = false;
+
 $('knownList').addEventListener('click', e => {
   const b = e.target.closest('[data-ev]');
   if (!b) return;
+  if (matchMedia('(max-width: 860px)').matches) $('sideDet').open = false;
   $('eventId').value = b.dataset.ev;
   filters.type.clear(); filters.level.clear(); filters.role.clear(); filters.q = '';
   load(b.dataset.ev, false);
 });
 
-$('sheet').addEventListener('click', async () => {
-  $('sheet').disabled = true;
-  setStatus(current.sheet ? 'Google Sheet frissítése…' : 'Google Sheet készül…');
-  try {
-    const params = { event: current.eventId, action: 'sheet' };
-    if (current.sheet) params.refresh = '1';
-    const data = await api(params);
-    if (params.refresh) { current = data; divisions = buildDivisions(current.rows); render(); }
-    else current.sheet = data.sheet;
-    renderSheet(data.sheet);
-    setStatus('Kész.');
-    window.open(data.sheet.url, '_blank', 'noopener');
-    loadKnown();
-  } catch (e) {
-    setStatus('Hiba: ' + e.message, true);
-  } finally {
-    $('sheet').disabled = false;
-  }
-});
-
-$('copyLink').addEventListener('click', async () => {
-  await navigator.clipboard.writeText(location.href);
-  setStatus('Link a vágólapon – a beállított szűrőkkel együtt nyílik meg.');
+$('refreshBtn').addEventListener('click', async () => {
+  if (!current) return;
+  if (!confirm('Új lekérés a scoring.dance-ről (1–3 perc). Indulhat?')) return;
+  $('refreshBtn').disabled = true;
+  await load(current.eventId, true);
+  $('refreshBtn').disabled = false;
 });
 
 /* ===== Indulás ===== */
@@ -491,5 +494,7 @@ loadKnown();
 const fromHash = readHash();
 if (/^\d+$/.test(fromHash)) { $('eventId').value = fromHash; load(fromHash, false); }
 </script>
+</main>
+</div>
 </body>
 </html>
